@@ -11,9 +11,17 @@ from openai import OpenAI
 from pinterest_scraper import get_pinterest_images, download_images
 from pathlib import Path
 import difflib
-from db import init_db, get_db, hash_content, generate_id
+import hashlib
+from db import init_db, get_db, hash_content, generate_id, can_delete_file
 
 load_dotenv()
+
+def get_image_hash(file_path):
+    sha256_hash = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        for byte_block in iter(lambda: f.read(4096), b""):
+            sha256_hash.update(byte_block)
+    return sha256_hash.hexdigest()
 
 app = FastAPI()
 
@@ -297,18 +305,62 @@ async def download_keyword_images(request: KeywordDownloadRequest):
             script_dir.mkdir(parents=True, exist_ok=True)
             
             for url in img_urls:
+                # Step 1: Pre-download URL Dedup
+                cursor.execute("""
+                    SELECT file_path, content_hash FROM images 
+                    WHERE source_url = ? AND status != 'deleted'
+                    LIMIT 1
+                """, (url,))
+                existing = cursor.fetchone()
+                
+                if existing:
+                    existing_path, existing_hash = existing[0], existing[1]
+                    img_uuid = generate_id()
+                    cursor.execute("""
+                        INSERT INTO images (id, anchor_id, file_path, keyword, source_url, content_hash)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """, (img_uuid, anchor_id, existing_path, request.keyword, url, existing_hash))
+                    new_image_paths.append(existing_path)
+                    continue
+
+                # Step 2: Download and Content Hash Dedup
                 img_uuid = generate_id()
                 file_path = script_dir / f"{img_uuid}.jpg"
                 path_str = file_path.as_posix()
                 
                 await loop.run_in_executor(None, download_image, url, file_path)
                 
-                # Record in DB
-                cursor.execute("""
-                    INSERT INTO images (id, anchor_id, file_path, keyword, source_url)
-                    VALUES (?, ?, ?, ?, ?)
-                """, (img_uuid, anchor_id, path_str, request.keyword, url))
-                new_image_paths.append(path_str)
+                if file_path.exists():
+                    img_hash = get_image_hash(file_path)
+                    
+                    # Check for content hash match
+                    cursor.execute("""
+                        SELECT file_path FROM images 
+                        WHERE content_hash = ? AND status != 'deleted'
+                        LIMIT 1
+                    """, (img_hash,))
+                    hash_match = cursor.fetchone()
+                    
+                    if hash_match:
+                        # Found duplicate by content!
+                        match_path = hash_match[0]
+                        # Delete the just-downloaded file (we don't need the helper here yet because we JUST created it)
+                        os.remove(file_path)
+                        
+                        cursor.execute("""
+                            INSERT INTO images (id, anchor_id, file_path, keyword, source_url, content_hash)
+                            VALUES (?, ?, ?, ?, ?, ?)
+                        """, (img_uuid, anchor_id, match_path, request.keyword, url, img_hash))
+                        new_image_paths.append(match_path)
+                    else:
+                        # Record in DB normally
+                        cursor.execute("""
+                            INSERT INTO images (id, anchor_id, file_path, keyword, source_url, content_hash)
+                            VALUES (?, ?, ?, ?, ?, ?)
+                        """, (img_uuid, anchor_id, path_str, request.keyword, url, img_hash))
+                        new_image_paths.append(path_str)
+                else:
+                    print(f"Failed to download image from {url}")
             
             conn.commit()
             conn.close()

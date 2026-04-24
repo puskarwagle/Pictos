@@ -8,8 +8,9 @@ NarrateImage is a specialized tool for video creators (AI creators, documentary 
 - **Robust Metadata Linking**: Uses a SQLite backend to anchor images to specific **text spans** (content-hashed) rather than unstable segment indices.
 - **Smart Fuzzy Matching**: If you edit your script, the system uses fuzzy string matching (92% threshold) to ensure images stay linked to their original sentences.
 - **Image Pinning**: Explicitly "lock" 📌 images to a text anchor so they survive even major script re-segmentations.
+- **Two-Step Deduplication**: Prevents duplicate assets by checking both **source URLs** (pre-download) and **image binary hashes** (post-download SHA-256).
 - **Interactive Keyword Downloads**: Click individual keywords to fetch images. Managed by a built-in concurrency queue (max 4 requests).
-- **Soft Deletion & Maintenance**: Deleting an image hides it from the UI but keeps it in a "soft-deleted" state. Use the built-in Garbage Collector to permanently purge unused assets.
+- **Soft Deletion & Reference-Counted Maintenance**: Deleting an image hides it from the UI. The Garbage Collector only permanently purges a physical file when **zero active or pinned records** reference it, safely handling shared assets.
 - **Edit Mode**: Directly edit AI-generated text and keywords within the app.
 - **Dark/Light Mode**: A modern, togglable UI for comfortable use.
 
@@ -65,10 +66,13 @@ USE_DB_READ=true
 
 ## Asset Persistence Model
 Unlike folder-based systems, NarrateImage uses a **Content-to-Asset** mapping:
-1. **Hash the Text**: Every segment's text is hashed (SHA-256).
-2. **Anchor the Image**: Images are linked to this hash (the "Anchor").
-3. **Fuzzy Recovery**: If you change "Hello world" to "Hello world!", the system sees the 95% similarity and automatically moves your images to the new version.
-4. **Stable Storage**: Files are saved as `downloaded_images/{script_id}/{uuid}.jpg`, making the filesystem a clean blob store while the DB handles the meaning.
+1. **Hash the Text**: Every segment's text is hashed (SHA-256) to create a stable "Anchor".
+2. **Deduplicate the Asset**: 
+    - **URL Check**: If the same Pinterest URL is requested, the system reuses the existing record.
+    - **Binary Hash**: Freshly downloaded images are hashed. If the bytes match an existing file (even with a different URL), the new file is deleted and the DB record is linked to the existing one.
+3. **Fuzzy Recovery**: If you change "Hello world" to "Hello world!", the system sees high similarity and automatically re-anchors your images.
+4. **Stable Storage**: Files are saved as `downloaded_images/{script_id}/{uuid}.jpg`. The DB handles a many-to-one relationship where multiple anchors can share the same physical file.
+5. **Safe GC**: The Garbage Collector uses reference counting. It will only `unlink()` a file if no active or pinned database records point to it.
 
 ## License
 MIT

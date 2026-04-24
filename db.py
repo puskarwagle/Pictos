@@ -46,6 +46,7 @@ def init_db():
             file_path TEXT NOT NULL,
             keyword TEXT,
             source_url TEXT,
+            content_hash TEXT,
             status TEXT DEFAULT 'active',
             user_touched BOOLEAN DEFAULT FALSE,
             pinned_to_anchor TEXT,
@@ -56,12 +57,34 @@ def init_db():
             FOREIGN KEY (anchor_id) REFERENCES text_anchors(id)
         );
         """)
+    
+    # Ensure content_hash column exists (for migrations)
+    with get_db() as conn:
+        try:
+            conn.execute("ALTER TABLE images ADD COLUMN content_hash TEXT")
+        except sqlite3.OperationalError:
+            # Column already exists
+            pass
 
 def generate_id():
     return str(uuid.uuid4())
 
 def hash_content(content: str) -> str:
     return hashlib.sha256(content.strip().encode('utf-8')).hexdigest()
+
+def can_delete_file(file_path: str, conn: sqlite3.Connection) -> bool:
+    """
+    Checks if a physical file can be safely deleted.
+    Returns True only if no active or pinned records reference this file path.
+    """
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT COUNT(*) FROM images 
+        WHERE (file_path = ? OR legacy_path = ?) 
+        AND status != 'deleted'
+    """, (file_path, file_path))
+    count = cursor.fetchone()[0]
+    return count == 0
 
 if __name__ == "__main__":
     init_db()

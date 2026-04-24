@@ -2,7 +2,7 @@ import sqlite3
 import argparse
 from pathlib import Path
 from datetime import datetime, timedelta
-from db import get_db
+from db import get_db, can_delete_file
 
 def gc(dry_run=True, ttl_days=30):
     conn = get_db()
@@ -11,7 +11,8 @@ def gc(dry_run=True, ttl_days=30):
     cutoff_date = datetime.now() - timedelta(days=ttl_days)
     
     report = {
-        "deleted_files": [],
+        "db_records_removed": 0,
+        "physical_files_unlinked": [],
         "orphaned_removed": 0,
         "trash_removed": 0,
         "total_size_freed": 0
@@ -40,21 +41,30 @@ def gc(dry_run=True, ttl_days=30):
         if path.exists():
             size = path.stat().st_size
             
+        # Check if file can be safely deleted (no other active records)
+        safe_to_delete = can_delete_file(path_str, conn)
+
         if not dry_run:
             try:
-                if path.exists():
+                if safe_to_delete and path.exists():
                     path.unlink()
+                    report["physical_files_unlinked"].append(path_str)
+                
                 cursor.execute("DELETE FROM images WHERE id = ?", (img_id,))
-                report["deleted_files"].append(path_str)
+                report["db_records_removed"] += 1
             except Exception as e:
                 print(f"Error deleting {path_str}: {e}")
                 continue
         else:
-            report["deleted_files"].append(f"[DRY RUN] {path_str}")
+            report["db_records_removed"] += 1
+            # In dry run, we assume it would be deleted if safe
+            if safe_to_delete:
+                report["physical_files_unlinked"].append(f"[DRY RUN] {path_str}")
 
         if status == 'orphaned': report["orphaned_removed"] += 1
         else: report["trash_removed"] += 1
-        report["total_size_freed"] += size
+        if safe_to_delete:
+            report["total_size_freed"] += size
 
     if not dry_run:
         conn.commit()
@@ -62,7 +72,8 @@ def gc(dry_run=True, ttl_days=30):
     conn.close()
     
     print("\n--- GC Summary ---")
-    print(f"Files removed: {len(report['deleted_files'])}")
+    print(f"DB Records removed: {report['db_records_removed']}")
+    print(f"Physical files unlinked: {len(report['physical_files_unlinked'])}")
     print(f"  - From Orphaned: {report['orphaned_removed']}")
     print(f"  - From Trash: {report['trash_removed']}")
     print(f"Total size freed: {report['total_size_freed'] / 1024 / 1024:.2f} MB")
