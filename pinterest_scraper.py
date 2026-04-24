@@ -4,6 +4,7 @@ Pinterest Image Scraper – all-in-one script.
 Usage: python pinterest_scraper.py <username> <tag> <num_images> [--headless]
 """
 
+import re
 import argparse
 import time
 import random
@@ -37,8 +38,10 @@ def get_image_urls(url, num_images=10, scroll_attempts_limit=250, headless=True)
 
             for img in img_elements:
                 src = img.get_attribute("src")
-                if src and src.startswith("http"):
-                    img_urls.add(src)
+                if src and "i.pinimg.com" in src:
+                    # Convert thumbnail URL to original resolution
+                    original_url = re.sub(r"/\d+x/", "/originals/", src)
+                    img_urls.add(original_url)
                 if len(img_urls) >= num_images:
                     break
 
