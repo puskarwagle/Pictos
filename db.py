@@ -46,6 +46,7 @@ def init_db():
             file_path TEXT NOT NULL,
             keyword TEXT,
             source_url TEXT,
+            source TEXT, -- 'pinterest', 'unsplash', etc.
             content_hash TEXT,
             status TEXT DEFAULT 'active',
             user_touched BOOLEAN DEFAULT FALSE,
@@ -58,13 +59,15 @@ def init_db():
         );
         """)
     
-    # Ensure content_hash column exists (for migrations)
+    # Ensure content_hash and source columns exist (for migrations)
     with get_db() as conn:
         try:
             conn.execute("ALTER TABLE images ADD COLUMN content_hash TEXT")
-        except sqlite3.OperationalError:
-            # Column already exists
-            pass
+        except sqlite3.OperationalError: pass
+        
+        try:
+            conn.execute("ALTER TABLE images ADD COLUMN source TEXT")
+        except sqlite3.OperationalError: pass
 
 def generate_id():
     return str(uuid.uuid4())
