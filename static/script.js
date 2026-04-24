@@ -16,6 +16,28 @@ document.addEventListener('DOMContentLoaded', () => {
     let selectedScript = null;
     let processedSegments = [];
 
+    // Dark Mode Toggle Logic
+    const darkModeToggle = document.getElementById('darkModeToggle');
+    // Enable dark mode by default if no preference is saved
+    const isDarkMode = localStorage.getItem('darkMode') !== 'false';
+    
+    if (darkModeToggle) {
+        darkModeToggle.checked = isDarkMode;
+        darkModeToggle.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                document.body.classList.add('dark-mode');
+                localStorage.setItem('darkMode', 'true');
+            } else {
+                document.body.classList.remove('dark-mode');
+                localStorage.setItem('darkMode', 'false');
+            }
+        });
+    }
+
+    if (isDarkMode) {
+        document.body.classList.add('dark-mode');
+    }
+
     // Load available scripts on startup
     async function loadScripts() {
         try {
