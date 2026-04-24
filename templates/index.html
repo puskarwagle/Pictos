@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NarrateImage - AI Image Suggester</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container-fluid">
+        <h1>NarrateImage</h1>
+        
+        <div class="main-layout">
+            <div class="sidebar">
+                <div id="scriptsListContainer">
+                    <h3>Select Script</h3>
+                    <div id="scriptsList" class="scripts-grid">
+                        <!-- Script tiles will be injected here -->
+                    </div>
+                </div>
+
+                <div id="scriptActions" style="display: none;">
+                    <button id="backBtn" class="secondary-btn">← Back to List</button>
+                    <h3 id="selectedScriptName"></h3>
+                    <div class="sidebar-controls">
+                        <button id="loadBtn">Load Last Response</button>
+                        <button id="processBtn">Process with AI (Replace)</button>
+                        <button id="downloadBtn" style="display: none;">Download Images</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="content-area">
+                <div id="editorContainer" class="editor-section" style="display: none;">
+                    <textarea id="scriptEditor" placeholder="Script content will appear here..."></textarea>
+                </div>
+
+                <div id="status" class="status"></div>
+
+                <div id="results" class="results-grid">
+                    <!-- Results will be injected here -->
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="/static/script.js"></script>
+</body>
+</html>

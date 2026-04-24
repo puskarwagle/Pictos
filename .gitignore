@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+.env
+
+# Project Specific
+downloaded_images/
+ai_responses/*.json
+video_scripts/*
+server.log
+nohup.out
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Playwright
+.auth/
+browser-data/

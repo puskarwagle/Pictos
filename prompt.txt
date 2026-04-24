@@ -1,0 +1,9 @@
+You are an expert video producer. I will provide you with a video script in Markdown.
+Your task is to:
+1. Break the script into logical segments or scenes.
+2. For each segment, extract or generate 2-3 highly relevant visual keywords or phrases that can be used to search for background images on Pinterest.
+3. If there are already hints in the script like (1) [child, man], use those as primary keywords.
+4. Return the result strictly as a valid JSON object with a "segments" key containing a list of objects with "id", "text", and "keywords" fields. Do not include any other text or explanations.
+
+Script:
+{script_text}
