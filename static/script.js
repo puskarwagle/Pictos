@@ -13,12 +13,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const loader = document.getElementById('loader');
     const segmentsContainer = document.getElementById('segmentsContainer');
     const rightSidebarImages = document.getElementById('rightSidebarImages');
+    const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
     const editModeToggle = document.getElementById('editModeToggle');
 
     let selectedScript = null;
     let processedSegments = [];
     let isEditMode = false;
     let activeSegmentIndex = -1;
+    let selectedImagePaths = new Set();
 
     // Concurrency Queue for Keyword Downloads
     const MAX_CONCURRENT_DOWNLOADS = 4;
@@ -281,17 +283,102 @@ document.addEventListener('DOMContentLoaded', () => {
     function showImages(idx) {
         const segment = processedSegments[idx];
         rightSidebarImages.innerHTML = '';
+        selectedImagePaths.clear();
+        updateDeleteButtonVisibility();
+
         if (segment.images && segment.images.length > 0) {
             segment.images.forEach(imgPath => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'image-wrapper';
+                
+                const circle = document.createElement('div');
+                circle.className = 'selection-circle';
+                
+                const pin = document.createElement('div');
+                pin.className = 'pin-icon';
+                pin.innerHTML = '📌';
+                pin.title = 'Pin image to this text anchor';
+                
                 const img = document.createElement('img');
                 const relativePath = imgPath.split('narrateImage/')[1] || imgPath;
                 img.src = '/' + relativePath;
-                rightSidebarImages.appendChild(img);
+                
+                wrapper.appendChild(circle);
+                wrapper.appendChild(pin);
+                wrapper.appendChild(img);
+                
+                pin.onclick = async (e) => {
+                    e.stopPropagation();
+                    const isPinned = wrapper.classList.toggle('pinned');
+                    try {
+                        const response = await fetch('/api/pin-image', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ image_path: imgPath, pin: isPinned })
+                        });
+                        if (!response.ok) throw new Error('Failed to pin image');
+                    } catch (err) {
+                        console.error(err);
+                        wrapper.classList.toggle('pinned'); // revert
+                    }
+                };
+
+                wrapper.onclick = () => {
+                    if (selectedImagePaths.has(imgPath)) {
+                        selectedImagePaths.delete(imgPath);
+                        wrapper.classList.remove('selected');
+                    } else {
+                        selectedImagePaths.add(imgPath);
+                        wrapper.classList.add('selected');
+                    }
+                    updateDeleteButtonVisibility();
+                };
+
+                rightSidebarImages.appendChild(wrapper);
             });
         } else {
             rightSidebarImages.innerHTML = '<p style="color: var(--status-text); font-style: italic;">No images downloaded for this segment yet. Click keywords to download.</p>';
         }
     }
+
+    function updateDeleteButtonVisibility() {
+        if (selectedImagePaths.size > 0) {
+            deleteSelectedBtn.style.display = 'block';
+            deleteSelectedBtn.textContent = `Delete Selected (${selectedImagePaths.size})`;
+        } else {
+            deleteSelectedBtn.style.display = 'none';
+        }
+    }
+
+    deleteSelectedBtn.onclick = async () => {
+        if (selectedImagePaths.size === 0) return;
+        if (!confirm(`Are you sure you want to delete ${selectedImagePaths.size} images?`)) return;
+
+        const pathsToDelete = Array.from(selectedImagePaths);
+        try {
+            setStatus(`Deleting ${pathsToDelete.length} images...`, true);
+            const response = await fetch('/api/delete-images', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image_paths: pathsToDelete })
+            });
+
+            if (!response.ok) throw new Error('Failed to delete images');
+            const data = await response.json();
+
+            // Update local state
+            if (activeSegmentIndex !== -1) {
+                processedSegments[activeSegmentIndex].images = processedSegments[activeSegmentIndex].images.filter(
+                    img => !data.deleted.includes(img)
+                );
+                showImages(activeSegmentIndex);
+                renderSegments(); // Re-render to update keyword tag colors if needed
+            }
+            setStatus(`Deleted ${data.deleted.length} images.`);
+        } catch (err) {
+            setStatus('Error deleting images: ' + err.message);
+        }
+    };
 
     loadScripts();
 });
