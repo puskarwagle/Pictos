@@ -11,6 +11,8 @@ ENV/
 downloaded_images/
 ai_responses/*.json
 video_scripts/*
+docs/
+
 server.log
 nohup.out
 
