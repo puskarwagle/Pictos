@@ -157,6 +157,26 @@ h1 {
     gap: 10px;
 }
 
+.control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.control-group label {
+    font-size: 0.85rem;
+    font-weight: bold;
+    color: var(--status-text);
+}
+
+.control-group select {
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid var(--sidebar-border);
+    background: var(--editor-bg);
+    color: var(--text-color);
+}
+
 .editor-section {
     display: flex;
     flex-direction: column;

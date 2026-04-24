@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const rightSidebarImages = document.getElementById('rightSidebarImages');
     const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
     const editModeToggle = document.getElementById('editModeToggle');
+    const imageSourceSelect = document.getElementById('imageSourceSelect');
 
     // Modal elements
     const imageModal = document.getElementById('imageModal');
@@ -36,7 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function processQueue() {
         if (activeDownloads >= MAX_CONCURRENT_DOWNLOADS || downloadQueue.length === 0) return;
 
-        const { segmentIdx, keyword, tagElement } = downloadQueue.shift();
+        const { segmentIdx, keyword, tagElement, source } = downloadQueue.shift();
         activeDownloads++;
         
         try {
@@ -49,7 +50,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({
                     filename: selectedScript,
                     segment_id: processedSegments[segmentIdx].id,
-                    keyword: keyword
+                    keyword: keyword,
+                    source: source
                 })
             });
 
@@ -74,7 +76,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function queueDownload(segmentIdx, keyword, tagElement) {
-        downloadQueue.push({ segmentIdx, keyword, tagElement });
+        const source = imageSourceSelect.value;
+        downloadQueue.push({ segmentIdx, keyword, tagElement, source });
         processQueue();
     }
 
@@ -206,7 +209,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/api/process-script', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ filename: selectedScript, script_text: scriptText })
+                body: JSON.stringify({ 
+                    filename: selectedScript, 
+                    script_text: scriptText,
+                    source: imageSourceSelect.value 
+                })
             });
             if (!response.ok) throw new Error('Failed to process script');
             
