@@ -24,3 +24,7 @@ Thumbs.db
 .auth/
 browser-data/
 video-scripts/
+
+# Database and Reports
+narrateimage.db
+reconciliation_report.json
