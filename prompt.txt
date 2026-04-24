@@ -28,6 +28,28 @@ GOOD examples:
 BAD examples:
   "confusion", "Nepal", "glasses", "sad person", "brain"
 
+CRITICAL PINTEREST REALITY CHECK:
+Pinterest is dominated by portrait photography, lifestyle aesthetics, nature, and conceptual photography. 
+Search titles MUST map to content that actually exists there in high volume.
+
+ALWAYS WORKS on Pinterest:
+- "moody cinematic portrait young man soft light"
+- "person alone window contemplative golden hour"
+- "overwhelmed scattered papers desk warm light"
+- "foggy mountain path lone figure Nepal"
+- "candid laugh embarrassed look away"
+- "close-up hands warm bokeh lifestyle"
+
+NEVER WORKS on Pinterest (avoid completely):
+- Specific cultural humor ("Nepal bureaucracy", "government ban")
+- Abstract tech metaphors ("digital glitch", "brain bug")  
+- Literal ADHD/mental health diagnosis imagery
+- Meme concepts
+- Anything too hyper-specific to not be photographed by thousands of people
+
+When in doubt, strip the concept to its EMOTION and COMPOSITION.
+"Person being laughed at for visiting a doctor" → "embarrassed smile looking down soft portrait photography"
+
 OUTPUT FORMAT:
 Return ONLY a valid JSON object. No markdown, no explanation, no extra text before or after.
 
