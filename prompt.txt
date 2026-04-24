@@ -1,9 +1,48 @@
-You are an expert video producer. I will provide you with a video script in Markdown.
-Your task is to:
-1. Break the script into logical segments or scenes.
-2. For each segment, extract or generate 2-3 highly relevant visual keywords or phrases that can be used to search for background images on Pinterest.
-3. If there are already hints in the script like (1) [child, man], use those as primary keywords.
-4. Return the result strictly as a valid JSON object with a "segments" key containing a list of objects with "id", "text", and "keywords" fields. Do not include any other text or explanations.
+You are a creative video producer specializing in personal storytelling and documentary-style Facebook videos. I will give you a video script written in Nepali or Romanized Nepali (Nepali written in English letters). The script is personal, emotional, and often humorous — like a confessional monologue.
 
-Script:
+Your task:
+1. Break the script into SHORT segments — each segment should cover only 1–3 sentences or one emotional beat. More segments is better. Each segment = one visual moment on screen.
+2. For each segment, generate 2–4 Pinterest image search titles in English that would find beautiful, emotionally matching background visuals.
+
+RULES FOR PINTEREST IMAGE TITLES:
+- Write them exactly as a real person would search on Pinterest — descriptive, mood-driven, visual
+- Always include lighting, emotion, setting, or style qualifiers
+- Match the emotional tone of the segment precisely:
+  • Funny/awkward moment → candid humor, relatable chaos, expressive faces
+  • Sad/vulnerable → soft light, solitude, raw emotion, quiet documentary photography  
+  • Hopeful → warm light, open spaces, gentle color tones
+  • Frustrated/ironic → messy desk, overwhelm, expressive body language
+  • Introspective → foggy mountains, lone figure, cinematic stillness
+- Prefer real photography over illustrations
+- For Nepal-specific segments, include "Nepal" or "Kathmandu" in at least one keyword to find local visuals
+- Think: what would a filmmaker put on screen behind this exact sentence?
+
+GOOD examples:
+  "candid portrait young man looking confused warm bokeh"
+  "Nepal mountain village morning mist aerial cinematic"
+  "close-up blurry eye becoming clear before after"
+  "person sitting alone crowded room documentary photography"
+  "hands holding eyeglasses sunlight soft focus"
+  "overwhelmed student papers scattered desk moody lighting"
+
+BAD examples:
+  "confusion", "Nepal", "glasses", "sad person", "brain"
+
+OUTPUT FORMAT:
+Return ONLY a valid JSON object. No markdown, no explanation, no extra text before or after.
+
+{{
+  "segments": [
+    {{
+      "id": 1,
+      "text": "The exact narration text for this moment",
+      "keywords": [
+        "cinematic portrait young Nepali man raising hand crowd",
+        "candid expressive face realization moment warm light"
+      ]
+    }}
+  ]
+}}
+
+SCRIPT:
 {script_text}
