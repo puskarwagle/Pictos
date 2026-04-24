@@ -243,10 +243,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 tag.textContent = keyword;
 
                 // Mark as downloaded if images exist for this keyword
-                const hasImages = segment.images && segment.images.some(img => 
-                    img.toLowerCase().includes(keyword.toLowerCase().replace(/ /g, '_'))
-                );
-                if (hasImages) tag.classList.add('downloaded');
+                const isDownloaded = (segment.downloaded_keywords && segment.downloaded_keywords.includes(keyword)) || 
+                                     (segment.images && segment.images.some(img => 
+                                        img.toLowerCase().includes(keyword.toLowerCase().replace(/ /g, '_'))
+                                     ));
+                if (isDownloaded) tag.classList.add('downloaded');
 
                 if (isEditMode) {
                     tag.contentEditable = true;
@@ -300,7 +301,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 pin.title = 'Pin image to this text anchor';
                 
                 const img = document.createElement('img');
-                const relativePath = imgPath.split('narrateImage/')[1] || imgPath;
+                // Ensure the path is relative to the root and handle both relative/absolute storage paths
+                let relativePath = imgPath.split('narrateImage/')[1] || imgPath;
+                if (relativePath.startsWith('/')) relativePath = relativePath.substring(1);
                 img.src = '/' + relativePath;
                 
                 wrapper.appendChild(circle);

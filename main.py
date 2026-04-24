@@ -51,6 +51,9 @@ def find_or_create_anchor(conn, script_id: str, content: str):
         similarity = difflib.SequenceMatcher(None, content, anchor["content"]).ratio()
         if similarity >= 0.92:
             print(f"Fuzzy match found (similarity: {similarity:.2f}). Reusing anchor {anchor['id']}.")
+            # Update the anchor with the new content and hash to ensure future exact matches
+            cursor.execute("UPDATE text_anchors SET content = ?, content_hash = ? WHERE id = ?", 
+                           (content, content_hash, anchor["id"]))
             return anchor["id"]
             
     # 3. No match, create new
@@ -95,16 +98,31 @@ def attach_images_to_segments(segments: List[dict], filename: str):
             # Match by content hash (preferred) or fuzzy match if we want to be more resilient
             content = segment.get("text", "")
             content_hash = hash_content(content)
+            ai_index = segment.get("id")
             
             # Find the anchor for this content in this script
+            # 1. Try segments table (most accurate for processed scripts)
             cursor.execute("""
-                SELECT id FROM text_anchors 
+                SELECT anchor_id FROM segments 
                 WHERE script_id = (SELECT id FROM scripts WHERE filename = ?) 
-                AND content_hash = ?
-            """, (filename, content_hash))
+                AND ai_index = ?
+                ORDER BY created_at DESC LIMIT 1
+            """, (filename, ai_index))
             row = cursor.fetchone()
             
-            anchor_id = row[0] if row else None
+            anchor_id = None
+            if row:
+                anchor_id = row[0]
+            else:
+                # 2. Fallback to direct anchor lookup by hash
+                cursor.execute("""
+                    SELECT id FROM text_anchors 
+                    WHERE script_id = (SELECT id FROM scripts WHERE filename = ?) 
+                    AND content_hash = ?
+                """, (filename, content_hash))
+                row = cursor.fetchone()
+                anchor_id = row[0] if row else None
+            
             images = []
             
             if anchor_id:
@@ -112,12 +130,13 @@ def attach_images_to_segments(segments: List[dict], filename: str):
                 cursor.execute("UPDATE images SET last_used = CURRENT_TIMESTAMP WHERE anchor_id = ?", (anchor_id,))
                 
                 # Fetch active or pinned images
-                cursor.execute("SELECT file_path FROM images WHERE anchor_id = ? AND status IN ('active', 'pinned')", (anchor_id,))
+                cursor.execute("SELECT file_path, keyword FROM images WHERE anchor_id = ? AND status IN ('active', 'pinned')", (anchor_id,))
                 rows = cursor.fetchall()
-                # Prefer file_path, fallback to legacy_path if needed (though they should be consistent)
                 images = [r["file_path"] for r in rows]
+                downloaded_keywords = list(set([r["keyword"] for r in rows if r["keyword"]]))
             
             segment["images"] = images
+            segment["downloaded_keywords"] = downloaded_keywords
         conn.commit()
         conn.close()
     else:
@@ -125,15 +144,20 @@ def attach_images_to_segments(segments: List[dict], filename: str):
         script_stem = Path(filename).stem
         for segment in segments:
             images = []
+            downloaded_keywords = []
             if "keywords" in segment:
                 # Strictly use the structured hierarchy: downloaded_images/script_name/segment_no/*/
                 segment_base_dir = DOWNLOAD_DIR / script_stem / str(segment["id"])
                 if segment_base_dir.exists():
                     for kw_dir in segment_base_dir.iterdir():
                         if kw_dir.is_dir():
-                            images.extend([f.as_posix() for f in kw_dir.glob("*.jpg")])
+                            kw_images = [f.as_posix() for f in kw_dir.glob("*.jpg")]
+                            if kw_images:
+                                images.extend(kw_images)
+                                downloaded_keywords.append(kw_dir.name.replace("_", " "))
             
             segment["images"] = images
+            segment["downloaded_keywords"] = downloaded_keywords
     return segments
 
 @app.get("/api/scripts")
@@ -161,12 +185,16 @@ async def get_script_response(filename: str):
         segments = data.get("segments", data) if isinstance(data, dict) else data
         return attach_images_to_segments(segments, filename)
 
+import string
+
 @app.post("/api/process-script")
 async def process_script(request: ProcessRequest):
     with open("prompt.txt", "r") as f:
         prompt_template = f.read()
     
-    prompt = prompt_template.format(script_text=request.script_text)
+    # Use Template to avoid KeyError with JSON braces in prompt.txt
+    t = string.Template(prompt_template.replace("{script_text}", "$script_text"))
+    prompt = t.substitute(script_text=request.script_text)
 
     try:
         response = client.chat.completions.create(
@@ -203,6 +231,9 @@ async def process_script(request: ProcessRequest):
             script_id = generate_id()
             cursor.execute("INSERT INTO scripts (id, filename) VALUES (?, ?)", (script_id, request.filename))
         
+        # Clear old segments for this script to avoid duplicates
+        cursor.execute("DELETE FROM segments WHERE script_id = ?", (script_id,))
+
         # 2. Process segments into DB
         new_anchor_ids = set()
         for segment in segments:
@@ -214,6 +245,7 @@ async def process_script(request: ProcessRequest):
                 INSERT INTO segments (id, script_id, anchor_id, ai_index, keywords)
                 VALUES (?, ?, ?, ?, ?)
             """, (generate_id(), script_id, anchor_id, segment.get("id"), json.dumps(segment.get("keywords", []))))
+
         
         # 3. Orphan images linked to anchors no longer in this script
         # Find all anchors previously associated with this script that are NOT in the new set
@@ -449,8 +481,8 @@ async def download_script_images(request: DownloadRequest):
 
 
 # Serve static files
-app.mount("/static", StaticFiles(directory="static"), name="static")
-app.mount("/downloaded_images", StaticFiles(directory="downloaded_images"), name="images")
+app.mount("/static", StaticFiles(directory=os.path.abspath("static")), name="static")
+app.mount("/downloaded_images", StaticFiles(directory=os.path.abspath("downloaded_images")), name="images")
 
 @app.get("/", response_class=HTMLResponse)
 async def get_index():
