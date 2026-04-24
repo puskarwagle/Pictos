@@ -254,6 +254,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     tag.onclick = (e) => {
                         e.stopPropagation();
+                        if (tag.classList.contains('downloaded')) {
+                            console.log(`Images already exist for "${keyword}", skipping request.`);
+                            return;
+                        }
                         queueDownload(idx, keyword, tag);
                     };
                 }

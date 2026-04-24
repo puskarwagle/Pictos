@@ -125,6 +125,13 @@ async def download_keyword_images(request: KeywordDownloadRequest):
     script_stem = Path(request.filename).stem
     # Hierarchy: script_name/segment_no/keyword_title/
     subfolder_name = f"{script_stem}/{request.segment_id}/{request.keyword.replace(' ', '_')}"
+    segment_dir = DOWNLOAD_DIR / subfolder_name
+    
+    # Check if images already exist
+    if segment_dir.exists() and any(segment_dir.glob("*.jpg")):
+        print(f"Images already exist for {request.keyword} in {subfolder_name}, skipping download.")
+        image_files = [f.as_posix() for f in segment_dir.glob("*.jpg")]
+        return {"images": image_files}
     
     try:
         loop = asyncio.get_event_loop()
@@ -145,7 +152,6 @@ async def download_keyword_images(request: KeywordDownloadRequest):
             )
             
             # Get the local paths of downloaded images
-            segment_dir = DOWNLOAD_DIR / subfolder_name
             image_files = [f.as_posix() for f in segment_dir.glob("*.jpg")]
             return {"images": image_files}
         return {"images": []}
@@ -168,6 +174,14 @@ async def download_script_images(request: DownloadRequest):
         primary_keyword = segment.keywords[0]
         # New hierarchy: script_name/segment_no/keyword_title/
         subfolder_name = f"{script_stem}/{segment_id}/{primary_keyword.replace(' ', '_')}"
+        segment_dir = DOWNLOAD_DIR / subfolder_name
+
+        # Check if images already exist
+        if segment_dir.exists() and any(segment_dir.glob("*.jpg")):
+            print(f"Images already exist for {primary_keyword} in {subfolder_name}, skipping download.")
+            segment.images = [f.as_posix() for f in segment_dir.glob("*.jpg")]
+            results.append(segment)
+            continue
         
         # Run scraping in a thread to avoid blocking
         try:
@@ -189,7 +203,6 @@ async def download_script_images(request: DownloadRequest):
                 )
                 
                 # Get the local paths of downloaded images
-                segment_dir = DOWNLOAD_DIR / subfolder_name
                 image_files = [f.as_posix() for f in segment_dir.glob("*.jpg")]
                 segment.images = image_files
         except Exception as e:

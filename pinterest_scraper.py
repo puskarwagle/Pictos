@@ -69,9 +69,12 @@ def download_images(img_urls, name_img):
     output_dir = Path("downloaded_images") / name_img
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # Use only the last component of the name for the filename to avoid creating subdirectories
+    filename_base = Path(name_img).name
+
     with ThreadPoolExecutor(max_workers=10) as executor:
         for index, img_url in enumerate(img_urls):
-            file_name = output_dir / f"{name_img}{index + 1}.jpg"
+            file_name = output_dir / f"{filename_base}_{index + 1}.jpg"
             executor.submit(download_image, img_url, file_name)
 
 
