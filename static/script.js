@@ -11,14 +11,30 @@ document.addEventListener('DOMContentLoaded', () => {
     const processBtn = document.getElementById('processBtn');
     const downloadBtn = document.getElementById('downloadBtn');
     const status = document.getElementById('status');
+    const statusText = document.getElementById('statusText');
+    const loader = document.getElementById('loader');
     const resultsDiv = document.getElementById('results');
 
     let selectedScript = null;
     let processedSegments = [];
 
+    function setStatus(text, showLoader = false) {
+        if (statusText) statusText.textContent = text;
+        if (loader) {
+            if (showLoader) loader.classList.add('active');
+            else loader.classList.remove('active');
+        }
+    }
+
+    function toggleButtons(disabled) {
+        loadBtn.disabled = disabled;
+        processBtn.disabled = disabled;
+        downloadBtn.disabled = disabled;
+        backBtn.disabled = disabled;
+    }
+
     // Dark Mode Toggle Logic
     const darkModeToggle = document.getElementById('darkModeToggle');
-    // Enable dark mode by default if no preference is saved
     const isDarkMode = localStorage.getItem('darkMode') !== 'false';
     
     if (darkModeToggle) {
@@ -38,7 +54,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.classList.add('dark-mode');
     }
 
-    // Load available scripts on startup
     async function loadScripts() {
         try {
             const response = await fetch('/api/scripts');
@@ -72,8 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 showScriptsList();
             }
         } catch (err) {
-            status.textContent = 'Error loading scripts: ' + err.message;
-            console.error(err);
+            setStatus('Error loading scripts: ' + err.message);
         }
     }
 
@@ -82,7 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
         scriptActions.style.display = 'none';
         editorContainer.style.display = 'none';
         resultsDiv.innerHTML = '';
-        status.textContent = 'Select a script to begin.';
+        setStatus('Select a script to begin.');
     }
 
     function showScriptActions(filename) {
@@ -97,9 +111,9 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('lastChosenScript', filename);
         showScriptActions(filename);
         
-        // Fetch script content
         try {
-            status.textContent = `Loading script: ${filename}...`;
+            setStatus(`Loading script: ${filename}...`, true);
+            toggleButtons(true);
             const response = await fetch(`/api/script/${filename}`);
             if (!response.ok) throw new Error('Failed to load script content');
             const data = await response.json();
@@ -107,9 +121,11 @@ document.addEventListener('DOMContentLoaded', () => {
             scriptEditor.value = data.content;
             downloadBtn.style.display = 'none';
             resultsDiv.innerHTML = '';
-            status.textContent = `Editing: ${filename}. You can Load last response or Process again.`;
+            setStatus(`Editing: ${filename}. You can Load last response or Process again.`);
         } catch (err) {
-            status.textContent = 'Error loading script: ' + err.message;
+            setStatus('Error loading script: ' + err.message);
+        } finally {
+            toggleButtons(false);
         }
     }
 
@@ -122,8 +138,8 @@ document.addEventListener('DOMContentLoaded', () => {
     loadBtn.addEventListener('click', async () => {
         if (!selectedScript) return;
         try {
-            loadBtn.disabled = true;
-            status.textContent = 'Loading cached response...';
+            toggleButtons(true);
+            setStatus('Loading cached response...', true);
             const response = await fetch(`/api/script/${selectedScript}/response`);
             if (!response.ok) {
                 if (response.status === 404) throw new Error('No cached response found. Please Process with AI first.');
@@ -132,12 +148,12 @@ document.addEventListener('DOMContentLoaded', () => {
             
             processedSegments = await response.json();
             renderSegments(processedSegments);
-            status.textContent = 'Cached response loaded.';
+            setStatus('Cached response loaded.');
             downloadBtn.style.display = 'inline-block';
         } catch (err) {
-            status.textContent = 'Error: ' + err.message;
+            setStatus('Error: ' + err.message);
         } finally {
-            loadBtn.disabled = false;
+            toggleButtons(false);
         }
     });
 
@@ -150,8 +166,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            processBtn.disabled = true;
-            status.textContent = 'Extracting keywords with AI (DeepSeek)...';
+            toggleButtons(true);
+            setStatus('Extracting keywords with AI (DeepSeek)...', true);
             resultsDiv.innerHTML = '';
 
             const response = await fetch('/api/process-script', {
@@ -168,19 +184,19 @@ document.addEventListener('DOMContentLoaded', () => {
             processedSegments = await response.json();
             renderSegments(processedSegments);
             
-            status.textContent = 'Keywords extracted. Ready to download images.';
+            setStatus('Keywords extracted. Ready to download images.');
             downloadBtn.style.display = 'inline-block';
         } catch (err) {
-            status.textContent = 'Error: ' + err.message;
+            setStatus('Error: ' + err.message);
         } finally {
-            processBtn.disabled = false;
+            toggleButtons(false);
         }
     });
 
     downloadBtn.addEventListener('click', async () => {
         try {
-            downloadBtn.disabled = true;
-            status.textContent = 'Downloading images from Pinterest...';
+            toggleButtons(true);
+            setStatus('Downloading images from Pinterest...', true);
 
             const response = await fetch('/api/download-images', {
                 method: 'POST',
@@ -193,11 +209,11 @@ document.addEventListener('DOMContentLoaded', () => {
             processedSegments = await response.json();
             renderSegments(processedSegments);
             
-            status.textContent = 'Image download complete!';
+            setStatus('Image download complete!');
         } catch (err) {
-            status.textContent = 'Error: ' + err.message;
+            setStatus('Error: ' + err.message);
         } finally {
-            downloadBtn.disabled = false;
+            toggleButtons(false);
         }
     });
 
