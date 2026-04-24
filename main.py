@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 from openai import OpenAI
 from pinterest_scraper import get_pinterest_images, download_images
+from unsplash_scraper import get_unsplash_images
 from pathlib import Path
 import difflib
 import hashlib
@@ -85,6 +86,7 @@ class ScriptSegment(BaseModel):
 class ProcessRequest(BaseModel):
     filename: str
     script_text: str
+    source: Optional[str] = "pinterest"
 
 class DownloadRequest(BaseModel):
     filename: str
@@ -189,7 +191,11 @@ import string
 
 @app.post("/api/process-script")
 async def process_script(request: ProcessRequest):
-    with open("prompt.txt", "r") as f:
+    prompt_file = "prompt_pinterest.txt"
+    if request.source == "unsplash" or request.source == "both":
+        prompt_file = "prompt_unsplash.txt"
+        
+    with open(prompt_file, "r") as f:
         prompt_template = f.read()
     
     # Use Template to avoid KeyError with JSON braces in prompt.txt
@@ -276,6 +282,7 @@ class KeywordDownloadRequest(BaseModel):
     filename: str
     segment_id: int
     keyword: str
+    source: Optional[str] = "pinterest"
 
 class DeleteImagesRequest(BaseModel):
     image_paths: List[str]
@@ -321,22 +328,30 @@ async def download_keyword_images(request: KeywordDownloadRequest):
     # 2. Scrape
     try:
         loop = asyncio.get_event_loop()
-        img_urls = await loop.run_in_executor(
-            None, 
-            get_pinterest_images, 
-            request.keyword, 
-            3, # number of images
-            True # headless
-        )
+        
+        source_urls = [] # list of (url, source_name)
+        
+        if request.source == "pinterest":
+            urls = await loop.run_in_executor(None, get_pinterest_images, request.keyword, 3, True)
+            source_urls = [(u, "pinterest") for u in urls]
+        elif request.source == "unsplash":
+            urls = await loop.run_in_executor(None, get_unsplash_images, request.keyword, 3, True)
+            source_urls = [(u, "unsplash") for u in urls]
+        elif request.source == "both":
+            # For both, we get 2 from each (capping at 4 total)
+            pin_task = loop.run_in_executor(None, get_pinterest_images, request.keyword, 2, True)
+            uns_task = loop.run_in_executor(None, get_unsplash_images, request.keyword, 2, True)
+            results = await asyncio.gather(pin_task, uns_task)
+            source_urls = [(u, "pinterest") for u in results[0]] + [(u, "unsplash") for u in results[1]]
         
         new_image_paths = []
-        if img_urls:
+        if source_urls:
             from pinterest_scraper import download_image
             # Stable directory for script: downloaded_images/{script_id}/
             script_dir = DOWNLOAD_DIR / script_id
             script_dir.mkdir(parents=True, exist_ok=True)
             
-            for url in img_urls:
+            for url, img_source in source_urls:
                 # Step 1: Pre-download URL Dedup
                 cursor.execute("""
                     SELECT file_path, content_hash FROM images 
@@ -349,9 +364,9 @@ async def download_keyword_images(request: KeywordDownloadRequest):
                     existing_path, existing_hash = existing[0], existing[1]
                     img_uuid = generate_id()
                     cursor.execute("""
-                        INSERT INTO images (id, anchor_id, file_path, keyword, source_url, content_hash)
-                        VALUES (?, ?, ?, ?, ?, ?)
-                    """, (img_uuid, anchor_id, existing_path, request.keyword, url, existing_hash))
+                        INSERT INTO images (id, anchor_id, file_path, keyword, source_url, source, content_hash)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """, (img_uuid, anchor_id, existing_path, request.keyword, url, img_source, existing_hash))
                     new_image_paths.append(existing_path)
                     continue
 
@@ -380,16 +395,16 @@ async def download_keyword_images(request: KeywordDownloadRequest):
                         os.remove(file_path)
                         
                         cursor.execute("""
-                            INSERT INTO images (id, anchor_id, file_path, keyword, source_url, content_hash)
-                            VALUES (?, ?, ?, ?, ?, ?)
-                        """, (img_uuid, anchor_id, match_path, request.keyword, url, img_hash))
+                            INSERT INTO images (id, anchor_id, file_path, keyword, source_url, source, content_hash)
+                            VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """, (img_uuid, anchor_id, match_path, request.keyword, url, img_source, img_hash))
                         new_image_paths.append(match_path)
                     else:
                         # Record in DB normally
                         cursor.execute("""
-                            INSERT INTO images (id, anchor_id, file_path, keyword, source_url, content_hash)
-                            VALUES (?, ?, ?, ?, ?, ?)
-                        """, (img_uuid, anchor_id, path_str, request.keyword, url, img_hash))
+                            INSERT INTO images (id, anchor_id, file_path, keyword, source_url, source, content_hash)
+                            VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """, (img_uuid, anchor_id, path_str, request.keyword, url, img_source, img_hash))
                         new_image_paths.append(path_str)
                 else:
                     print(f"Failed to download image from {url}")
