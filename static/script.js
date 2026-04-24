@@ -16,6 +16,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
     const editModeToggle = document.getElementById('editModeToggle');
 
+    // Modal elements
+    const imageModal = document.getElementById('imageModal');
+    const modalImg = document.getElementById('modalImg');
+    const modalCaption = document.getElementById('modalCaption');
+    const closeModal = document.querySelector('.close-modal');
+
     let selectedScript = null;
     let processedSegments = [];
     let isEditMode = false;
@@ -310,6 +316,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 wrapper.appendChild(pin);
                 wrapper.appendChild(img);
                 
+                img.style.cursor = 'zoom-in';
+
+                circle.onclick = (e) => {
+                    e.stopPropagation();
+                    if (selectedImagePaths.has(imgPath)) {
+                        selectedImagePaths.delete(imgPath);
+                        wrapper.classList.remove('selected');
+                    } else {
+                        selectedImagePaths.add(imgPath);
+                        wrapper.classList.add('selected');
+                    }
+                    updateDeleteButtonVisibility();
+                };
+
                 pin.onclick = async (e) => {
                     e.stopPropagation();
                     const isPinned = wrapper.classList.toggle('pinned');
@@ -326,15 +346,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 };
 
-                wrapper.onclick = () => {
-                    if (selectedImagePaths.has(imgPath)) {
-                        selectedImagePaths.delete(imgPath);
-                        wrapper.classList.remove('selected');
-                    } else {
-                        selectedImagePaths.add(imgPath);
-                        wrapper.classList.add('selected');
-                    }
-                    updateDeleteButtonVisibility();
+                img.onclick = (e) => {
+                    e.stopPropagation();
+                    console.log('Image clicked, opening modal:', img.src);
+                    imageModal.style.display = "block";
+                    modalImg.src = img.src;
+                    modalCaption.innerHTML = imgPath.split('/').pop();
                 };
 
                 rightSidebarImages.appendChild(wrapper);
@@ -343,6 +360,16 @@ document.addEventListener('DOMContentLoaded', () => {
             rightSidebarImages.innerHTML = '<p style="color: var(--status-text); font-style: italic;">No images downloaded for this segment yet. Click keywords to download.</p>';
         }
     }
+
+    // Modal Close logic
+    if (closeModal) {
+        closeModal.onclick = () => imageModal.style.display = "none";
+    }
+    window.onclick = (event) => {
+        if (event.target == imageModal) {
+            imageModal.style.display = "none";
+        }
+    };
 
     function updateDeleteButtonVisibility() {
         if (selectedImagePaths.size > 0) {
