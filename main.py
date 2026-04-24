@@ -39,6 +39,25 @@ class ProcessRequest(BaseModel):
     filename: str
     script_text: str
 
+class DownloadRequest(BaseModel):
+    filename: str
+    segments: List[ScriptSegment]
+
+def attach_images_to_segments(segments: List[dict], filename: str):
+    script_stem = Path(filename).stem
+    for segment in segments:
+        images = []
+        if "keywords" in segment:
+            # Strictly use the structured hierarchy: downloaded_images/script_name/segment_no/*/
+            segment_base_dir = DOWNLOAD_DIR / script_stem / str(segment["id"])
+            if segment_base_dir.exists():
+                for kw_dir in segment_base_dir.iterdir():
+                    if kw_dir.is_dir():
+                        images.extend([f.as_posix() for f in kw_dir.glob("*.jpg")])
+        
+        segment["images"] = images
+    return segments
+
 @app.get("/api/scripts")
 async def list_scripts():
     scripts = [f.name for f in SCRIPTS_DIR.glob("*.md")]
@@ -61,9 +80,8 @@ async def get_script_response(filename: str):
         raise HTTPException(status_code=404, detail=f"No cached response found at {response_file}")
     with open(response_file, "r") as f:
         data = json.load(f)
-        if isinstance(data, dict) and "segments" in data:
-            return data["segments"]
-        return data
+        segments = data.get("segments", data) if isinstance(data, dict) else data
+        return attach_images_to_segments(segments, filename)
 
 @app.post("/api/process-script")
 async def process_script(request: ProcessRequest):
@@ -92,17 +110,55 @@ async def process_script(request: ProcessRequest):
         with open(response_file, "w") as f:
             json.dump(result, f, indent=4)
 
-        if isinstance(result, dict) and "segments" in result:
-            return result["segments"]
-        return result
+        segments = result.get("segments", result) if isinstance(result, dict) else result
+        return attach_images_to_segments(segments, request.filename)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/download-images")
-async def download_script_images(segments: List[ScriptSegment]):
-    results = []
+class KeywordDownloadRequest(BaseModel):
+    filename: str
+    segment_id: int
+    keyword: str
+
+@app.post("/api/download-keyword-images")
+async def download_keyword_images(request: KeywordDownloadRequest):
+    script_stem = Path(request.filename).stem
+    # Hierarchy: script_name/segment_no/keyword_title/
+    subfolder_name = f"{script_stem}/{request.segment_id}/{request.keyword.replace(' ', '_')}"
     
-    for segment in segments:
+    try:
+        loop = asyncio.get_event_loop()
+        img_urls = await loop.run_in_executor(
+            None, 
+            get_pinterest_images, 
+            request.keyword, 
+            3, # number of images
+            True # headless
+        )
+        
+        if img_urls:
+            await loop.run_in_executor(
+                None,
+                download_images,
+                img_urls,
+                subfolder_name
+            )
+            
+            # Get the local paths of downloaded images
+            segment_dir = DOWNLOAD_DIR / subfolder_name
+            image_files = [f.as_posix() for f in segment_dir.glob("*.jpg")]
+            return {"images": image_files}
+        return {"images": []}
+    except Exception as e:
+        print(f"Error scraping for keyword {request.keyword}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/download-images")
+async def download_script_images(request: DownloadRequest):
+    results = []
+    script_stem = Path(request.filename).stem
+    
+    for segment in request.segments:
         segment_id = segment.id
         # Use the first keyword for searching
         if not segment.keywords:
@@ -110,7 +166,8 @@ async def download_script_images(segments: List[ScriptSegment]):
             continue
             
         primary_keyword = segment.keywords[0]
-        folder_name = f"segment_{segment_id}_{primary_keyword.replace(' ', '_')}"
+        # New hierarchy: script_name/segment_no/keyword_title/
+        subfolder_name = f"{script_stem}/{segment_id}/{primary_keyword.replace(' ', '_')}"
         
         # Run scraping in a thread to avoid blocking
         try:
@@ -128,12 +185,12 @@ async def download_script_images(segments: List[ScriptSegment]):
                     None,
                     download_images,
                     img_urls,
-                    folder_name
+                    subfolder_name
                 )
                 
                 # Get the local paths of downloaded images
-                segment_dir = DOWNLOAD_DIR / folder_name
-                image_files = [str(f) for f in segment_dir.glob("*.jpg")]
+                segment_dir = DOWNLOAD_DIR / subfolder_name
+                image_files = [f.as_posix() for f in segment_dir.glob("*.jpg")]
                 segment.images = image_files
         except Exception as e:
             print(f"Error scraping for segment {segment_id}: {e}")
@@ -141,6 +198,7 @@ async def download_script_images(segments: List[ScriptSegment]):
         results.append(segment)
         
     return results
+
 
 # Serve static files
 app.mount("/static", StaticFiles(directory="static"), name="static")

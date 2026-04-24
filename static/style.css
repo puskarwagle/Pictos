@@ -16,6 +16,13 @@
     --card-border: #eee;
     --keyword-bg: #f0f0f0;
     --keyword-text: #444;
+
+    /* Soft Palette - Light */
+    --seg-color-1: #e3f2fd;
+    --seg-color-2: #f3e5f5;
+    --seg-color-3: #e8f5e9;
+    --seg-color-4: #fff3e0;
+    --seg-color-5: #fce4ec;
 }
 
 body.dark-mode {
@@ -36,6 +43,13 @@ body.dark-mode {
     --card-border: #444;
     --keyword-bg: #444;
     --keyword-text: #ddd;
+
+    /* Soft Palette - Dark */
+    --seg-color-1: #1a237e44;
+    --seg-color-2: #4a148c44;
+    --seg-color-3: #1b5e2044;
+    --seg-color-4: #e6510044;
+    --seg-color-5: #880e4f44;
 }
 
 body {
@@ -69,7 +83,7 @@ h1 {
 }
 
 .sidebar {
-    width: 300px;
+    width: 250px;
     background: var(--sidebar-bg);
     border-right: 1px solid var(--sidebar-border);
     padding: 15px;
@@ -91,6 +105,22 @@ h1 {
     padding: 20px;
     overflow-y: auto;
     background: var(--content-area-bg, #fdfdfd);
+    border-right: 1px solid var(--sidebar-border);
+}
+
+.right-sidebar {
+    width: 350px;
+    background: var(--sidebar-bg);
+    padding: 15px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.right-sidebar h3 {
+    margin-top: 0;
+    font-size: 1.1rem;
 }
 
 .scripts-grid {
@@ -136,8 +166,7 @@ h1 {
 
 #scriptEditor {
     width: 100%;
-    height: 90vh;
-    overflow-x: auto;
+    height: 80vh;
     padding: 15px;
     border: 1px solid var(--editor-border);
     border-radius: 8px;
@@ -222,36 +251,60 @@ body.dark-mode .secondary-btn:hover {
     display: inline-block;
 }
 
-.results-grid {
+/* Segment Blocks Styles */
+.segments-container {
     display: flex;
     flex-direction: column;
-    gap: 20px;
-    margin-top: 20px;
+    gap: 0; /* No gap for a continuous flow */
 }
 
-.segment-card {
-    border: 1px solid var(--card-border);
-    border-radius: 12px;
+.segment-block {
     padding: 20px;
-    display: flex;
-    gap: 20px;
-    background: var(--card-bg);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    position: relative;
 }
 
-.segment-info {
-    flex: 1;
+.segment-block:hover {
+    border-color: #e60023;
+    z-index: 1;
 }
 
-.segment-text {
-    font-size: 1rem;
+.segment-block.active {
+    border-color: #e60023;
+    box-shadow: inset 4px 0 0 #e60023;
+    z-index: 2;
+}
+
+.segment-block.color-1 { background-color: var(--seg-color-1); }
+.segment-block.color-2 { background-color: var(--seg-color-2); }
+.segment-block.color-3 { background-color: var(--seg-color-3); }
+.segment-block.color-4 { background-color: var(--seg-color-4); }
+.segment-block.color-5 { background-color: var(--seg-color-5); }
+
+.segment-block-text {
+    font-size: 1.1rem;
     margin-bottom: 10px;
+    min-height: 1.5em;
 }
 
-.segment-keywords {
+.segment-block-keywords {
     display: flex;
     flex-wrap: wrap;
     gap: 5px;
+}
+
+/* Editable Styles */
+.edit-mode .segment-block-text {
+    background: var(--editor-bg);
+    padding: 5px;
+    border: 1px dashed var(--editor-border);
+    border-radius: 4px;
+}
+
+.edit-mode .keyword-tag {
+    cursor: text;
 }
 
 .keyword-tag {
@@ -260,24 +313,51 @@ body.dark-mode .secondary-btn:hover {
     border-radius: 15px;
     font-size: 0.8rem;
     color: var(--keyword-text);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s;
 }
 
-.segment-images {
-    display: flex;
+.keyword-tag:hover {
+    background: #e60023;
+    color: white;
+}
+
+.keyword-tag.downloading {
+    background: #ff9800 !important;
+    color: white !important;
+    animation: pulse 1.5s infinite;
+}
+
+.keyword-tag.downloaded {
+    background: #4caf50 !important;
+    color: white !important;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.6; }
+    100% { opacity: 1; }
+}
+
+.right-sidebar-images {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 10px;
-    flex-wrap: wrap;
-    max-width: 450px;
 }
 
-.segment-images img {
-    width: 140px;
-    height: 140px;
+.right-sidebar-images img {
+    width: 100%;
+    aspect-ratio: 1;
     object-fit: cover;
-    border-radius: 10px;
+    border-radius: 8px;
     border: 1px solid var(--tile-border);
-    transition: transform 0.2s;
 }
 
-.segment-images img:hover {
-    transform: scale(1.05);
+.toggle-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 0;
 }
+

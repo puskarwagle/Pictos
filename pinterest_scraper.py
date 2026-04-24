@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.13
 """
 Pinterest Image Scraper – all-in-one script.
 Usage: python pinterest_scraper.py <username> <tag> <num_images> [--headless]
@@ -11,7 +11,7 @@ import urllib.request
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 
-from playwright.sync_api import sync_playwright
+from camoufox.sync_api import Camoufox
 
 
 def get_image_urls(url, num_images=10, scroll_attempts_limit=250, headless=True):
@@ -19,17 +19,13 @@ def get_image_urls(url, num_images=10, scroll_attempts_limit=250, headless=True)
     Open a Pinterest board URL, scroll down, and collect image URLs.
     Returns a list of image URLs (up to `num_images`).
     """
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=headless)
-        context = browser.new_context()
-        page = context.new_page()
-
+    with Camoufox(headless=headless) as browser:
+        page = browser.new_page()
         try:
             page.goto(url, timeout=0)
             page.wait_for_selector("img", timeout=60000)
         except Exception as e:
             print(f"Error loading page: {e}")
-            browser.close()
             return []
 
         img_urls = set()
@@ -53,7 +49,6 @@ def get_image_urls(url, num_images=10, scroll_attempts_limit=250, headless=True)
             time.sleep(t)
             scroll_attempts += 1
 
-        browser.close()
         return list(img_urls)[:num_images]
 
 

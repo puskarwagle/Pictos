@@ -22,10 +22,16 @@
                 <div id="scriptActions" style="display: none;">
                     <button id="backBtn" class="secondary-btn">← Back to List</button>
                     <h3 id="selectedScriptName"></h3>
+                    
+                    <div class="toggle-container">
+                        <label style="cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="editModeToggle"> 
+                            <span>Edit Mode</span>
+                        </label>
+                    </div>
+
                     <div class="sidebar-controls">
-                        <button id="loadBtn">Load Last Response</button>
                         <button id="processBtn">Process with AI (Replace)</button>
-                        <button id="downloadBtn" style="display: none;">Download Images</button>
                     </div>
                 </div>
 
@@ -37,7 +43,7 @@
                 </div>
             </div>
 
-            <div class="content-area">
+            <div class="content-area" id="contentArea">
                 <div id="editorContainer" class="editor-section" style="display: none;">
                     <textarea id="scriptEditor" placeholder="Script content will appear here..."></textarea>
                 </div>
@@ -47,8 +53,15 @@
                     <span id="statusText">Select a script to begin.</span>
                 </div>
 
-                <div id="results" class="results-grid">
-                    <!-- Results will be injected here -->
+                <div id="segmentsContainer" class="segments-container">
+                    <!-- Segment blocks will be injected here -->
+                </div>
+            </div>
+
+            <div class="right-sidebar" id="rightSidebar">
+                <h3>Images</h3>
+                <div id="rightSidebarImages" class="right-sidebar-images">
+                    <p style="color: var(--status-text); font-style: italic;">Select a segment to view images.</p>
                 </div>
             </div>
         </div>

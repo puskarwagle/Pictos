@@ -21,3 +21,4 @@ Thumbs.db
 # Playwright
 .auth/
 browser-data/
+video-scripts/

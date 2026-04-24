@@ -7,16 +7,68 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const editorContainer = document.getElementById('editorContainer');
     const scriptEditor = document.getElementById('scriptEditor');
-    const loadBtn = document.getElementById('loadBtn');
     const processBtn = document.getElementById('processBtn');
-    const downloadBtn = document.getElementById('downloadBtn');
     const status = document.getElementById('status');
     const statusText = document.getElementById('statusText');
     const loader = document.getElementById('loader');
-    const resultsDiv = document.getElementById('results');
+    const segmentsContainer = document.getElementById('segmentsContainer');
+    const rightSidebarImages = document.getElementById('rightSidebarImages');
+    const editModeToggle = document.getElementById('editModeToggle');
 
     let selectedScript = null;
     let processedSegments = [];
+    let isEditMode = false;
+    let activeSegmentIndex = -1;
+
+    // Concurrency Queue for Keyword Downloads
+    const MAX_CONCURRENT_DOWNLOADS = 4;
+    let activeDownloads = 0;
+    const downloadQueue = [];
+
+    async function processQueue() {
+        if (activeDownloads >= MAX_CONCURRENT_DOWNLOADS || downloadQueue.length === 0) return;
+
+        const { segmentIdx, keyword, tagElement } = downloadQueue.shift();
+        activeDownloads++;
+        
+        try {
+            tagElement.classList.add('downloading');
+            tagElement.classList.remove('downloaded');
+            
+            const response = await fetch('/api/download-keyword-images', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    filename: selectedScript,
+                    segment_id: processedSegments[segmentIdx].id,
+                    keyword: keyword
+                })
+            });
+
+            if (!response.ok) throw new Error('Download failed');
+            const data = await response.json();
+            
+            // Add new images to segment and remove duplicates
+            const currentImages = processedSegments[segmentIdx].images || [];
+            const newImages = [...new Set([...currentImages, ...data.images])];
+            processedSegments[segmentIdx].images = newImages;
+
+            tagElement.classList.add('downloaded');
+            if (activeSegmentIndex === segmentIdx) showImages(segmentIdx);
+        } catch (err) {
+            console.error(`Failed to download images for ${keyword}:`, err);
+            setStatus(`Failed to download: ${keyword}`);
+        } finally {
+            tagElement.classList.remove('downloading');
+            activeDownloads--;
+            processQueue();
+        }
+    }
+
+    function queueDownload(segmentIdx, keyword, tagElement) {
+        downloadQueue.push({ segmentIdx, keyword, tagElement });
+        processQueue();
+    }
 
     function setStatus(text, showLoader = false) {
         if (statusText) statusText.textContent = text;
@@ -27,32 +79,30 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function toggleButtons(disabled) {
-        loadBtn.disabled = disabled;
         processBtn.disabled = disabled;
-        downloadBtn.disabled = disabled;
         backBtn.disabled = disabled;
     }
 
-    // Dark Mode Toggle Logic
+    // Dark Mode Toggle
     const darkModeToggle = document.getElementById('darkModeToggle');
     const isDarkMode = localStorage.getItem('darkMode') !== 'false';
     
     if (darkModeToggle) {
         darkModeToggle.checked = isDarkMode;
         darkModeToggle.addEventListener('change', (e) => {
-            if (e.target.checked) {
-                document.body.classList.add('dark-mode');
-                localStorage.setItem('darkMode', 'true');
-            } else {
-                document.body.classList.remove('dark-mode');
-                localStorage.setItem('darkMode', 'false');
-            }
+            document.body.classList.toggle('dark-mode', e.target.checked);
+            localStorage.setItem('darkMode', e.target.checked);
         });
     }
+    if (isDarkMode) document.body.classList.add('dark-mode');
 
-    if (isDarkMode) {
-        document.body.classList.add('dark-mode');
-    }
+    // Edit Mode Toggle
+    editModeToggle.addEventListener('change', (e) => {
+        isEditMode = e.target.checked;
+        document.body.classList.toggle('edit-mode', isEditMode);
+        scriptEditor.readOnly = !isEditMode;
+        renderSegments(); // Re-render to show/hide edit inputs
+    });
 
     async function loadScripts() {
         try {
@@ -67,25 +117,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const lastScript = localStorage.getItem('lastChosenScript');
-            let scriptToAutoSelect = null;
-
             scripts.forEach(script => {
                 const tile = document.createElement('div');
                 tile.className = 'script-tile';
                 tile.textContent = script;
                 tile.onclick = () => selectScript(script);
                 scriptsList.appendChild(tile);
-
-                if (script === lastScript) {
-                    scriptToAutoSelect = script;
-                }
+                if (script === lastScript) selectScript(script);
             });
-
-            if (scriptToAutoSelect) {
-                selectScript(scriptToAutoSelect);
-            } else {
-                showScriptsList();
-            }
         } catch (err) {
             setStatus('Error loading scripts: ' + err.message);
         }
@@ -95,21 +134,18 @@ document.addEventListener('DOMContentLoaded', () => {
         scriptsListContainer.style.display = 'block';
         scriptActions.style.display = 'none';
         editorContainer.style.display = 'none';
-        resultsDiv.innerHTML = '';
+        segmentsContainer.innerHTML = '';
+        rightSidebarImages.innerHTML = '<p style="color: var(--status-text); font-style: italic;">Select a segment to view images.</p>';
         setStatus('Select a script to begin.');
-    }
-
-    function showScriptActions(filename) {
-        scriptsListContainer.style.display = 'none';
-        scriptActions.style.display = 'block';
-        selectedScriptName.textContent = filename;
-        editorContainer.style.display = 'flex';
     }
 
     async function selectScript(filename) {
         selectedScript = filename;
         localStorage.setItem('lastChosenScript', filename);
-        showScriptActions(filename);
+        scriptsListContainer.style.display = 'none';
+        scriptActions.style.display = 'block';
+        selectedScriptName.textContent = filename;
+        editorContainer.style.display = 'flex';
         
         try {
             setStatus(`Loading script: ${filename}...`, true);
@@ -119,9 +155,23 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             
             scriptEditor.value = data.content;
-            downloadBtn.style.display = 'none';
-            resultsDiv.innerHTML = '';
-            setStatus(`Editing: ${filename}. You can Load last response or Process again.`);
+            scriptEditor.readOnly = !isEditMode;
+            segmentsContainer.innerHTML = '';
+            
+            // Auto-load cached response
+            try {
+                const cacheResp = await fetch(`/api/script/${filename}/response`);
+                if (cacheResp.ok) {
+                    processedSegments = await cacheResp.json();
+                    renderSegments();
+                    setStatus(`Loaded: ${filename}. Cached AI response found.`);
+                } else {
+                    setStatus(`Editing: ${filename}. No cached response found. Click Process to start.`);
+                }
+            } catch (cacheErr) {
+                setStatus(`Editing: ${filename}. (Error checking cache)`);
+            }
+
         } catch (err) {
             setStatus('Error loading script: ' + err.message);
         } finally {
@@ -135,57 +185,26 @@ document.addEventListener('DOMContentLoaded', () => {
         showScriptsList();
     });
 
-    loadBtn.addEventListener('click', async () => {
-        if (!selectedScript) return;
-        try {
-            toggleButtons(true);
-            setStatus('Loading cached response...', true);
-            const response = await fetch(`/api/script/${selectedScript}/response`);
-            if (!response.ok) {
-                if (response.status === 404) throw new Error('No cached response found. Please Process with AI first.');
-                throw new Error('Failed to load cached response');
-            }
-            
-            processedSegments = await response.json();
-            renderSegments(processedSegments);
-            setStatus('Cached response loaded.');
-            downloadBtn.style.display = 'inline-block';
-        } catch (err) {
-            setStatus('Error: ' + err.message);
-        } finally {
-            toggleButtons(false);
-        }
-    });
-
     processBtn.addEventListener('click', async () => {
         if (!selectedScript) return;
         const scriptText = scriptEditor.value.trim();
-        if (!scriptText) {
-            alert('Editor is empty!');
-            return;
-        }
+        if (!scriptText) return alert('Editor is empty!');
 
         try {
             toggleButtons(true);
             setStatus('Extracting keywords with AI (DeepSeek)...', true);
-            resultsDiv.innerHTML = '';
+            segmentsContainer.innerHTML = '';
 
             const response = await fetch('/api/process-script', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    filename: selectedScript,
-                    script_text: scriptText
-                })
+                body: JSON.stringify({ filename: selectedScript, script_text: scriptText })
             });
-
             if (!response.ok) throw new Error('Failed to process script');
             
             processedSegments = await response.json();
-            renderSegments(processedSegments);
-            
-            setStatus('Keywords extracted. Ready to download images.');
-            downloadBtn.style.display = 'inline-block';
+            renderSegments();
+            setStatus('Keywords extracted. Click tags to download images.');
         } catch (err) {
             setStatus('Error: ' + err.message);
         } finally {
@@ -193,62 +212,81 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    downloadBtn.addEventListener('click', async () => {
-        try {
-            toggleButtons(true);
-            setStatus('Downloading images from Pinterest...', true);
-
-            const response = await fetch('/api/download-images', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(processedSegments)
-            });
-
-            if (!response.ok) throw new Error('Failed to download images');
-            
-            processedSegments = await response.json();
-            renderSegments(processedSegments);
-            
-            setStatus('Image download complete!');
-        } catch (err) {
-            setStatus('Error: ' + err.message);
-        } finally {
-            toggleButtons(false);
+    function renderSegments() {
+        if (processedSegments.length > 0) {
+            editorContainer.style.display = isEditMode ? 'flex' : 'none';
         }
-    });
-
-    function renderSegments(segments) {
-        resultsDiv.innerHTML = '';
-        segments.forEach(segment => {
-            const card = document.createElement('div');
-            card.className = 'segment-card';
+        
+        segmentsContainer.innerHTML = '';
+        processedSegments.forEach((segment, idx) => {
+            const block = document.createElement('div');
+            const colorIdx = (idx % 5) + 1;
+            block.className = `segment-block color-${colorIdx} ${idx === activeSegmentIndex ? 'active' : ''}`;
             
-            const info = document.createElement('div');
-            info.className = 'segment-info';
-            info.innerHTML = `
-                <div class="segment-text">${segment.text}</div>
-                <div class="segment-keywords">
-                    ${segment.keywords.map(k => `<span class="keyword-tag">${k}</span>`).join('')}
-                </div>
-            `;
-            
-            const imagesDiv = document.createElement('div');
-            imagesDiv.className = 'segment-images';
-            if (segment.images && segment.images.length > 0) {
-                segment.images.forEach(imgPath => {
-                    const img = document.createElement('img');
-                    const relativePath = imgPath.split('narrateImage/')[1] || imgPath;
-                    img.src = '/' + relativePath;
-                    imagesDiv.appendChild(img);
+            const textDiv = document.createElement('div');
+            textDiv.className = 'segment-block-text';
+            textDiv.textContent = segment.text;
+            if (isEditMode) {
+                textDiv.contentEditable = true;
+                textDiv.addEventListener('input', (e) => {
+                    processedSegments[idx].text = e.target.textContent;
                 });
-            } else {
-                imagesDiv.innerHTML = '<em>No images yet</em>';
             }
             
-            card.appendChild(info);
-            card.appendChild(imagesDiv);
-            resultsDiv.appendChild(card);
+            const keywordsDiv = document.createElement('div');
+            keywordsDiv.className = 'segment-block-keywords';
+            segment.keywords.forEach((keyword, kIdx) => {
+                const tag = document.createElement('span');
+                tag.className = 'keyword-tag';
+                tag.textContent = keyword;
+
+                // Mark as downloaded if images exist for this keyword
+                const hasImages = segment.images && segment.images.some(img => 
+                    img.toLowerCase().includes(keyword.toLowerCase().replace(/ /g, '_'))
+                );
+                if (hasImages) tag.classList.add('downloaded');
+
+                if (isEditMode) {
+                    tag.contentEditable = true;
+                    tag.addEventListener('input', (e) => {
+                        processedSegments[idx].keywords[kIdx] = e.target.textContent;
+                    });
+                } else {
+                    tag.onclick = (e) => {
+                        e.stopPropagation();
+                        queueDownload(idx, keyword, tag);
+                    };
+                }
+                keywordsDiv.appendChild(tag);
+            });
+
+            block.appendChild(textDiv);
+            block.appendChild(keywordsDiv);
+            
+            block.addEventListener('click', () => {
+                document.querySelectorAll('.segment-block').forEach(b => b.classList.remove('active'));
+                block.classList.add('active');
+                activeSegmentIndex = idx;
+                showImages(idx);
+            });
+
+            segmentsContainer.appendChild(block);
         });
+    }
+
+    function showImages(idx) {
+        const segment = processedSegments[idx];
+        rightSidebarImages.innerHTML = '';
+        if (segment.images && segment.images.length > 0) {
+            segment.images.forEach(imgPath => {
+                const img = document.createElement('img');
+                const relativePath = imgPath.split('narrateImage/')[1] || imgPath;
+                img.src = '/' + relativePath;
+                rightSidebarImages.appendChild(img);
+            });
+        } else {
+            rightSidebarImages.innerHTML = '<p style="color: var(--status-text); font-style: italic;">No images downloaded for this segment yet. Click keywords to download.</p>';
+        }
     }
 
     loadScripts();
