@@ -8,14 +8,17 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from openai import OpenAI
-from pinterest_scraper import get_pinterest_images, download_images
-from unsplash_scraper import get_unsplash_images
+from pinterest_scraper import get_pinterest_images_async, download_images
+from unsplash_scraper import get_unsplash_images_async
 from pathlib import Path
 import difflib
 import hashlib
 from db import init_db, get_db, hash_content, generate_id, can_delete_file
 
 load_dotenv()
+
+# Global semaphore to limit concurrent browser instances
+BROWSER_SEMAPHORE = asyncio.Semaphore(2)
 
 def get_image_hash(file_path):
     sha256_hash = hashlib.sha256()
@@ -126,15 +129,16 @@ def attach_images_to_segments(segments: List[dict], filename: str):
                 anchor_id = row[0] if row else None
             
             images = []
+            downloaded_keywords = []
             
             if anchor_id:
                 # Update last_used for all images attached to this anchor
                 cursor.execute("UPDATE images SET last_used = CURRENT_TIMESTAMP WHERE anchor_id = ?", (anchor_id,))
                 
-                # Fetch active or pinned images
-                cursor.execute("SELECT file_path, keyword FROM images WHERE anchor_id = ? AND status IN ('active', 'pinned')", (anchor_id,))
+                # Fetch active or pinned images - now including source
+                cursor.execute("SELECT file_path, keyword, source FROM images WHERE anchor_id = ? AND status IN ('active', 'pinned')", (anchor_id,))
                 rows = cursor.fetchall()
-                images = [r["file_path"] for r in rows]
+                images = [{"path": r["file_path"], "source": r["source"], "keyword": r["keyword"]} for r in rows]
                 downloaded_keywords = list(set([r["keyword"] for r in rows if r["keyword"]]))
             
             segment["images"] = images
@@ -155,7 +159,8 @@ def attach_images_to_segments(segments: List[dict], filename: str):
                         if kw_dir.is_dir():
                             kw_images = [f.as_posix() for f in kw_dir.glob("*.jpg")]
                             if kw_images:
-                                images.extend(kw_images)
+                                # Legacy scanning doesn't easily know the source, defaulting to unknown
+                                images.extend([{"path": img, "source": "unknown"} for img in kw_images])
                                 downloaded_keywords.append(kw_dir.name.replace("_", " "))
             
             segment["images"] = images
@@ -189,32 +194,61 @@ async def get_script_response(filename: str):
 
 import string
 
+async def call_ai(prompt: str):
+    """Helper to call DeepSeek AI asynchronously."""
+    response = await asyncio.to_thread(
+        client.chat.completions.create,
+        model="deepseek-chat",
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant that extracts visual keywords from scripts. Output strictly valid JSON."},
+            {"role": "user", "content": prompt}
+        ],
+        response_format={"type": "json_object"}
+    )
+    return json.loads(response.choices[0].message.content)
+
 @app.post("/api/process-script")
 async def process_script(request: ProcessRequest):
-    prompt_file = "prompt_pinterest.txt"
-    if request.source == "unsplash" or request.source == "both":
-        prompt_file = "prompt_unsplash.txt"
-        
-    with open(prompt_file, "r") as f:
-        prompt_template = f.read()
-    
-    # Use Template to avoid KeyError with JSON braces in prompt.txt
-    t = string.Template(prompt_template.replace("{script_text}", "$script_text"))
-    prompt = t.substitute(script_text=request.script_text)
-
     try:
-        response = client.chat.completions.create(
-            model="deepseek-chat",
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant that extracts visual keywords from scripts. Output strictly valid JSON."},
-                {"role": "user", "content": prompt}
-            ],
-            response_format={"type": "json_object"}
-        )
-        
-        raw_content = response.choices[0].message.content
-        result = json.loads(raw_content)
-        
+        if request.source == "both":
+            with open("prompt_pinterest.txt", "r") as f:
+                p_pin = f.read()
+            with open("prompt_unsplash.txt", "r") as f:
+                p_uns = f.read()
+            
+            t_pin = string.Template(p_pin.replace("{script_text}", "$script_text"))
+            t_uns = string.Template(p_uns.replace("{script_text}", "$script_text"))
+            
+            prompt_pin = t_pin.substitute(script_text=request.script_text)
+            prompt_uns = t_uns.substitute(script_text=request.script_text)
+            
+            # Parallel calls
+            res_pin, res_uns = await asyncio.gather(call_ai(prompt_pin), call_ai(prompt_uns))
+            
+            segs_pin = res_pin.get("segments", res_pin)
+            segs_uns = res_uns.get("segments", res_uns)
+            
+            # Merge results
+            merged_segments = []
+            for i in range(max(len(segs_pin), len(segs_uns))):
+                s_pin = segs_pin[i] if i < len(segs_pin) else {"text": "", "keywords": [], "id": i}
+                s_uns = segs_uns[i] if i < len(segs_uns) else {"text": "", "keywords": [], "id": i}
+                
+                merged_segments.append({
+                    "id": s_pin.get("id", i),
+                    "text": s_pin.get("text") or s_uns.get("text"),
+                    "keywords": s_pin.get("keywords", []) + ["|"] + s_uns.get("keywords", [])
+                })
+            result = {"segments": merged_segments}
+        else:
+            prompt_file = "prompt_pinterest.txt" if request.source == "pinterest" else "prompt_unsplash.txt"
+            with open(prompt_file, "r") as f:
+                prompt_template = f.read()
+            
+            t = string.Template(prompt_template.replace("{script_text}", "$script_text"))
+            prompt = t.substitute(script_text=request.script_text)
+            result = await call_ai(prompt)
+
         # Save the AI response to a file (legacy fallback)
         stem = Path(request.filename).stem
         response_file = RESPONSES_DIR / f"{stem}.json"
@@ -327,24 +361,23 @@ async def download_keyword_images(request: KeywordDownloadRequest):
     
     # 2. Scrape
     try:
-        loop = asyncio.get_event_loop()
-        
         source_urls = [] # list of (url, source_name)
         
-        if request.source == "pinterest":
-            urls = await loop.run_in_executor(None, get_pinterest_images, request.keyword, 3, True)
-            source_urls = [(u, "pinterest") for u in urls]
-        elif request.source == "unsplash":
-            urls = await loop.run_in_executor(None, get_unsplash_images, request.keyword, 3, True)
-            source_urls = [(u, "unsplash") for u in urls]
-        elif request.source == "both":
-            # For both, we get 2 from each (capping at 4 total)
-            pin_task = loop.run_in_executor(None, get_pinterest_images, request.keyword, 2, True)
-            uns_task = loop.run_in_executor(None, get_unsplash_images, request.keyword, 2, True)
-            results = await asyncio.gather(pin_task, uns_task)
-            source_urls = [(u, "pinterest") for u in results[0]] + [(u, "unsplash") for u in results[1]]
+        async with BROWSER_SEMAPHORE:
+            if request.source == "pinterest":
+                urls = await get_pinterest_images_async(request.keyword, 3, True)
+                source_urls = [(u, "pinterest") for u in urls]
+            elif request.source == "unsplash":
+                urls = await get_unsplash_images_async(request.keyword, 3, True)
+                source_urls = [(u, "unsplash") for u in urls]
+            elif request.source == "both":
+                # For both, we get 2 from each (capping at 4 total)
+                pin_task = get_pinterest_images_async(request.keyword, 2, True)
+                uns_task = get_unsplash_images_async(request.keyword, 2, True)
+                results = await asyncio.gather(pin_task, uns_task)
+                source_urls = [(u, "pinterest") for u in results[0]] + [(u, "unsplash") for u in results[1]]
         
-        new_image_paths = []
+        new_images = []
         if source_urls:
             from pinterest_scraper import download_image
             # Stable directory for script: downloaded_images/{script_id}/
@@ -367,7 +400,7 @@ async def download_keyword_images(request: KeywordDownloadRequest):
                         INSERT INTO images (id, anchor_id, file_path, keyword, source_url, source, content_hash)
                         VALUES (?, ?, ?, ?, ?, ?, ?)
                     """, (img_uuid, anchor_id, existing_path, request.keyword, url, img_source, existing_hash))
-                    new_image_paths.append(existing_path)
+                    new_images.append({"path": existing_path, "source": img_source, "keyword": request.keyword})
                     continue
 
                 # Step 2: Download and Content Hash Dedup
@@ -398,20 +431,20 @@ async def download_keyword_images(request: KeywordDownloadRequest):
                             INSERT INTO images (id, anchor_id, file_path, keyword, source_url, source, content_hash)
                             VALUES (?, ?, ?, ?, ?, ?, ?)
                         """, (img_uuid, anchor_id, match_path, request.keyword, url, img_source, img_hash))
-                        new_image_paths.append(match_path)
+                        new_images.append({"path": match_path, "source": img_source, "keyword": request.keyword})
                     else:
                         # Record in DB normally
                         cursor.execute("""
                             INSERT INTO images (id, anchor_id, file_path, keyword, source_url, source, content_hash)
                             VALUES (?, ?, ?, ?, ?, ?, ?)
                         """, (img_uuid, anchor_id, path_str, request.keyword, url, img_source, img_hash))
-                        new_image_paths.append(path_str)
+                        new_images.append({"path": path_str, "source": img_source, "keyword": request.keyword})
                 else:
                     print(f"Failed to download image from {url}")
             
             conn.commit()
             conn.close()
-            return {"images": new_image_paths}
+            return {"images": new_images}
             
         conn.close()
         return {"images": []}
@@ -461,22 +494,21 @@ async def download_script_images(request: DownloadRequest):
         # Check if images already exist
         if segment_dir.exists() and any(segment_dir.glob("*.jpg")):
             print(f"Images already exist for {primary_keyword} in {subfolder_name}, skipping download.")
-            segment.images = [f.as_posix() for f in segment_dir.glob("*.jpg")]
+            segment.images = [{"path": f.as_posix(), "source": "unknown"} for f in segment_dir.glob("*.jpg")]
             results.append(segment)
             continue
         
-        # Run scraping in a thread to avoid blocking
+        # Run scraping
         try:
-            loop = asyncio.get_event_loop()
-            img_urls = await loop.run_in_executor(
-                None, 
-                get_pinterest_images, 
-                primary_keyword, 
-                3, # number of images per segment
-                True # headless
-            )
+            async with BROWSER_SEMAPHORE:
+                img_urls = await get_pinterest_images_async(
+                    primary_keyword, 
+                    3, # number of images per segment
+                    True # headless
+                )
             
             if img_urls:
+                loop = asyncio.get_event_loop()
                 await loop.run_in_executor(
                     None,
                     download_images,
@@ -485,7 +517,7 @@ async def download_script_images(request: DownloadRequest):
                 )
                 
                 # Get the local paths of downloaded images
-                image_files = [f.as_posix() for f in segment_dir.glob("*.jpg")]
+                image_files = [{"path": f.as_posix(), "source": "pinterest"} for f in segment_dir.glob("*.jpg")]
                 segment.images = image_files
         except Exception as e:
             print(f"Error scraping for segment {segment_id}: {e}")

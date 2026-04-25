@@ -4,6 +4,7 @@ Pinterest Image Scraper – all-in-one script.
 Usage: python pinterest_scraper.py <username> <tag> <num_images> [--headless]
 """
 
+import asyncio
 import re
 import argparse
 import time
@@ -12,19 +13,19 @@ import urllib.request
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 
-from camoufox.sync_api import Camoufox
+from camoufox.async_api import AsyncCamoufox as Camoufox
 
 
-def get_image_urls(url, num_images=10, scroll_attempts_limit=250, headless=True):
+async def get_image_urls(url, num_images=10, scroll_attempts_limit=250, headless=True):
     """
     Open a Pinterest board URL, scroll down, and collect image URLs.
     Returns a list of image URLs (up to `num_images`).
     """
-    with Camoufox(headless=headless) as browser:
-        page = browser.new_page()
+    async with Camoufox(headless=headless) as browser:
+        page = await browser.new_page()
         try:
-            page.goto(url, timeout=0)
-            page.wait_for_selector("img", timeout=60000)
+            await page.goto(url, timeout=0)
+            await page.wait_for_selector("img", timeout=60000)
         except Exception as e:
             print(f"Error loading page: {e}")
             return []
@@ -33,11 +34,11 @@ def get_image_urls(url, num_images=10, scroll_attempts_limit=250, headless=True)
         scroll_attempts = 0
 
         while len(img_urls) < num_images and scroll_attempts < scroll_attempts_limit:
-            page.wait_for_selector("img", timeout=60000)
-            img_elements = page.query_selector_all("img")
+            await page.wait_for_selector("img", timeout=60000)
+            img_elements = await page.query_selector_all("img")
 
             for img in img_elements:
-                src = img.get_attribute("src")
+                src = await img.get_attribute("src")
                 if src and "i.pinimg.com" in src:
                     # Convert thumbnail URL to original resolution
                     original_url = re.sub(r"/\d+x/", "/originals/", src)
@@ -46,10 +47,10 @@ def get_image_urls(url, num_images=10, scroll_attempts_limit=250, headless=True)
                     break
 
             # Scroll to the bottom
-            page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
             print(f"Scrolling: {scroll_attempts}", end="\r")
             t = random.randint(4, 8)
-            time.sleep(t)
+            await asyncio.sleep(t)
             scroll_attempts += 1
 
         return list(img_urls)[:num_images]
@@ -93,10 +94,17 @@ def parse_args():
 def get_pinterest_images(tag, num_images=5, headless=True):
     """
     Search for a tag on Pinterest and return image URLs.
+    Legacy sync wrapper.
+    """
+    return asyncio.run(get_pinterest_images_async(tag, num_images, headless))
+
+async def get_pinterest_images_async(tag, num_images=5, headless=True):
+    """
+    Search for a tag on Pinterest and return image URLs (Async).
     """
     url = f"https://www.pinterest.com/search/pins/?q={tag}"
     print(f"Searching Pinterest for: {tag}")
-    return get_image_urls(url, num_images=num_images, headless=headless)
+    return await get_image_urls(url, num_images=num_images, headless=headless)
 
 def main():
     args = parse_args()
@@ -110,11 +118,11 @@ def main():
         
     print(f"Starting with URL: {pinterest_url}")
 
-    img_urls = get_image_urls(
+    img_urls = asyncio.run(get_image_urls(
         pinterest_url,
         num_images=args.num_images,
         headless=args.headless,
-    )
+    ))
 
     if not img_urls:
         print("No images found. Please try again.")
