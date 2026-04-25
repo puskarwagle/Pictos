@@ -371,11 +371,10 @@ async def download_keyword_images(request: KeywordDownloadRequest):
                 urls = await get_unsplash_images_async(request.keyword, 3, True)
                 source_urls = [(u, "unsplash") for u in urls]
             elif request.source == "both":
-                # For both, we get 2 from each (capping at 4 total)
-                pin_task = get_pinterest_images_async(request.keyword, 2, True)
-                uns_task = get_unsplash_images_async(request.keyword, 2, True)
-                results = await asyncio.gather(pin_task, uns_task)
-                source_urls = [(u, "pinterest") for u in results[0]] + [(u, "unsplash") for u in results[1]]
+                # Serializing to avoid memory corruption from parallel browser initialization
+                urls_pin = await get_pinterest_images_async(request.keyword, 2, True)
+                urls_uns = await get_unsplash_images_async(request.keyword, 2, True)
+                source_urls = [(u, "pinterest") for u in urls_pin] + [(u, "unsplash") for u in urls_uns]
         
         new_images = []
         if source_urls:
@@ -384,6 +383,7 @@ async def download_keyword_images(request: KeywordDownloadRequest):
             script_dir = DOWNLOAD_DIR / script_id
             script_dir.mkdir(parents=True, exist_ok=True)
             
+            loop = asyncio.get_running_loop()
             for url, img_source in source_urls:
                 # Step 1: Pre-download URL Dedup
                 cursor.execute("""
@@ -508,7 +508,7 @@ async def download_script_images(request: DownloadRequest):
                 )
             
             if img_urls:
-                loop = asyncio.get_event_loop()
+                loop = asyncio.get_running_loop()
                 await loop.run_in_executor(
                     None,
                     download_images,
