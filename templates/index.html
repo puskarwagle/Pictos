@@ -12,7 +12,12 @@
         
         <div class="main-layout">
             <div class="sidebar">
-                <div id="scriptsListContainer">
+                <div id="activeScriptHeader" style="display: none; align-items: center; gap: 15px; margin-bottom: 20px;">
+                    <button id="backBtn" class="secondary-btn icon-btn" title="Back to List"><span>&larr;</span></button>
+                    <h3 id="selectedScriptName" style="margin: 0; flex: 1; font-size: 1.2rem; word-break: break-all;"></h3>
+                </div>
+
+                <div id="scriptsListContainer" class="sidebar-card">
                     <h3>Select Script</h3>
                     <div id="scriptsList" class="scripts-grid">
                         <!-- Script tiles will be injected here -->
@@ -20,34 +25,40 @@
                 </div>
 
                 <div id="scriptActions" style="display: none;">
-                    <button id="backBtn" class="secondary-btn">← Back to List</button>
-                    <h3 id="selectedScriptName"></h3>
-                    
-                    <div class="toggle-container">
-                        <label style="cursor: pointer; display: flex; align-items: center; gap: 8px;">
-                            <input type="checkbox" id="editModeToggle"> 
-                            <span>Edit Mode</span>
-                        </label>
-                    </div>
-
                     <div class="sidebar-controls">
                         <div class="control-group">
-                            <label for="imageSourceSelect">Image Source:</label>
-                            <select id="imageSourceSelect">
-                                <option value="pinterest">Pinterest</option>
-                                <option value="unsplash">Unsplash</option>
-                                <option value="both">Both</option>
-                            </select>
+                            <div class="platform-selector">
+                                <label class="platform-option">
+                                    <input type="checkbox" name="platform" value="pinterest" checked>
+                                    <span class="platform-circle"></span>
+                                    Pinterest
+                                </label>
+                                <label class="platform-option">
+                                    <input type="checkbox" name="platform" value="unsplash" checked>
+                                    <span class="platform-circle"></span>
+                                    Unsplash
+                                </label>
+                            </div>
                         </div>
-                        <button id="processBtn">Process with AI (Replace)</button>
+                        <button id="processBtn"><span>&#10024;</span> Process with AI</button>
                     </div>
                 </div>
 
-                <div class="theme-toggle" style="margin-top: auto; padding-top: 15px; border-top: 1px solid var(--sidebar-border, #ddd);">
-                    <label style="cursor: pointer; display: flex; align-items: center; gap: 8px;">
-                        <input type="checkbox" id="darkModeToggle"> 
-                        <span>Dark Mode</span>
-                    </label>
+                <div class="settings-card sidebar-card" style="margin-top: auto;">
+                    <div class="toggle-container">
+                        <span class="toggle-label">Edit Mode</span>
+                        <label class="switch">
+                            <input type="checkbox" id="editModeToggle">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="toggle-container">
+                        <span class="toggle-label">Dark Mode</span>
+                        <label class="switch">
+                            <input type="checkbox" id="darkModeToggle">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
                 </div>
             </div>
 
@@ -56,23 +67,18 @@
                     <textarea id="scriptEditor" placeholder="Script content will appear here..."></textarea>
                 </div>
 
-                <div id="status" class="status">
-                    <div id="loader" class="loader"></div>
-                    <span id="statusText">Select a script to begin.</span>
-                </div>
-
                 <div id="segmentsContainer" class="segments-container">
                     <!-- Segment blocks will be injected here -->
                 </div>
             </div>
 
             <div class="right-sidebar" id="rightSidebar">
-                <div class="sidebar-header">
-                    <h3>Images</h3>
+                <div class="sidebar-header sidebar-card">
+                    <h3 style="margin-bottom: 0;">Images</h3>
                     <button id="deleteSelectedBtn" class="delete-btn" style="display: none;">Delete Selected</button>
                 </div>
-                <div id="rightSidebarImages" class="right-sidebar-images">
-                    <p style="color: var(--status-text); font-style: italic;">Select a segment to view images.</p>
+                <div id="rightSidebarImages" class="right-sidebar-images" style="padding: 5px;">
+                    <p style="color: var(--status-text); font-style: italic; text-align: center;">Select a segment to view images.</p>
                 </div>
             </div>
         </div>
@@ -82,6 +88,8 @@
         <img class="modal-content" id="modalImg">
         <div id="modalCaption"></div>
     </div>
+
+    <div id="toastContainer" class="toast-container"></div>
 
     <script src="/static/script.js"></script>
 </body>

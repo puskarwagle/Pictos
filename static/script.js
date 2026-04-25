@@ -2,20 +2,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const scriptsListContainer = document.getElementById('scriptsListContainer');
     const scriptsList = document.getElementById('scriptsList');
     const scriptActions = document.getElementById('scriptActions');
+    const activeScriptHeader = document.getElementById('activeScriptHeader');
     const selectedScriptName = document.getElementById('selectedScriptName');
     const backBtn = document.getElementById('backBtn');
     
     const editorContainer = document.getElementById('editorContainer');
     const scriptEditor = document.getElementById('scriptEditor');
     const processBtn = document.getElementById('processBtn');
-    const status = document.getElementById('status');
-    const statusText = document.getElementById('statusText');
-    const loader = document.getElementById('loader');
+    const toastContainer = document.getElementById('toastContainer');
     const segmentsContainer = document.getElementById('segmentsContainer');
     const rightSidebarImages = document.getElementById('rightSidebarImages');
     const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
     const editModeToggle = document.getElementById('editModeToggle');
-    const imageSourceSelect = document.getElementById('imageSourceSelect');
+
+    const getSelectedSource = () => {
+        const checked = Array.from(document.querySelectorAll('input[name="platform"]:checked')).map(cb => cb.value);
+        if (checked.length === 2) return 'both';
+        if (checked.length === 1) return checked[0];
+        return 'pinterest'; // Default fallback
+    };
 
     // Modal elements
     const imageModal = document.getElementById('imageModal');
@@ -58,16 +63,26 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!response.ok) throw new Error('Download failed');
             const data = await response.json();
             
-            // Add new images to segment and remove duplicates
+            // Add new images to segment and remove duplicates by path
             const currentImages = processedSegments[segmentIdx].images || [];
-            const newImages = [...new Set([...currentImages, ...data.images])];
-            processedSegments[segmentIdx].images = newImages;
+            const allImages = [...currentImages, ...data.images];
+            
+            // Deduplicate by path
+            const uniqueImagesMap = new Map();
+            allImages.forEach(img => {
+                const path = typeof img === 'string' ? img : img.path;
+                if (!uniqueImagesMap.has(path)) {
+                    uniqueImagesMap.set(path, img);
+                }
+            });
+            
+            processedSegments[segmentIdx].images = Array.from(uniqueImagesMap.values());
 
             tagElement.classList.add('downloaded');
             if (activeSegmentIndex === segmentIdx) showImages(segmentIdx);
         } catch (err) {
             console.error(`Failed to download images for ${keyword}:`, err);
-            setStatus(`Failed to download: ${keyword}`);
+            setStatus(`Failed to download: ${keyword}`, false, true);
         } finally {
             tagElement.classList.remove('downloading');
             activeDownloads--;
@@ -76,16 +91,30 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function queueDownload(segmentIdx, keyword, tagElement) {
-        const source = imageSourceSelect.value;
+        const source = getSelectedSource();
         downloadQueue.push({ segmentIdx, keyword, tagElement, source });
         processQueue();
     }
 
-    function setStatus(text, showLoader = false) {
-        if (statusText) statusText.textContent = text;
-        if (loader) {
-            if (showLoader) loader.classList.add('active');
-            else loader.classList.remove('active');
+    function showToast(message, type = 'info', duration = 5000) {
+        if (!toastContainer) return;
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.textContent = message;
+        toastContainer.appendChild(toast);
+        
+        // Trigger reflow
+        setTimeout(() => toast.classList.add('show'), 10);
+        
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }, duration);
+    }
+
+    function setStatus(text, showLoader = false, isToast = true) {
+        if (text) {
+            showToast(text);
         }
     }
 
@@ -112,7 +141,14 @@ document.addEventListener('DOMContentLoaded', () => {
         isEditMode = e.target.checked;
         document.body.classList.toggle('edit-mode', isEditMode);
         scriptEditor.readOnly = !isEditMode;
-        renderSegments(); // Re-render to show/hide edit inputs
+        
+        // Mutually exclusive visibility
+        editorContainer.style.display = isEditMode ? 'flex' : 'none';
+        segmentsContainer.style.display = isEditMode ? 'none' : 'flex';
+        
+        if (!isEditMode) {
+            renderSegments(); // Refresh segments when exiting edit mode
+        }
     });
 
     async function loadScripts() {
@@ -144,6 +180,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function showScriptsList() {
         scriptsListContainer.style.display = 'block';
         scriptActions.style.display = 'none';
+        activeScriptHeader.style.display = 'none';
         editorContainer.style.display = 'none';
         segmentsContainer.innerHTML = '';
         rightSidebarImages.innerHTML = '<p style="color: var(--status-text); font-style: italic;">Select a segment to view images.</p>';
@@ -155,8 +192,12 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('lastChosenScript', filename);
         scriptsListContainer.style.display = 'none';
         scriptActions.style.display = 'block';
+        activeScriptHeader.style.display = 'flex';
         selectedScriptName.textContent = filename;
-        editorContainer.style.display = 'flex';
+        
+        // Mutually exclusive visibility
+        editorContainer.style.display = isEditMode ? 'flex' : 'none';
+        segmentsContainer.style.display = isEditMode ? 'none' : 'flex';
         
         try {
             setStatus(`Loading script: ${filename}...`, true);
@@ -175,12 +216,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (cacheResp.ok) {
                     processedSegments = await cacheResp.json();
                     renderSegments();
-                    setStatus(`Loaded: ${filename}. Cached AI response found.`);
+                    setStatus(`Loaded: ${filename}. Cached AI response found.`, false, true);
+                    setStatus('');
                 } else {
-                    setStatus(`Editing: ${filename}. No cached response found. Click Process to start.`);
+                    setStatus('No cached response found. Click Process to start.');
                 }
             } catch (cacheErr) {
-                setStatus(`Editing: ${filename}. (Error checking cache)`);
+                setStatus('Error checking cache.');
             }
 
         } catch (err) {
@@ -212,7 +254,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({ 
                     filename: selectedScript, 
                     script_text: scriptText,
-                    source: imageSourceSelect.value 
+                    source: getSelectedSource() 
                 })
             });
             if (!response.ok) throw new Error('Failed to process script');
@@ -228,10 +270,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function renderSegments() {
-        if (processedSegments.length > 0) {
-            editorContainer.style.display = isEditMode ? 'flex' : 'none';
-        }
-        
         segmentsContainer.innerHTML = '';
         processedSegments.forEach((segment, idx) => {
             const block = document.createElement('div');
@@ -251,6 +289,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const keywordsDiv = document.createElement('div');
             keywordsDiv.className = 'segment-block-keywords';
             segment.keywords.forEach((keyword, kIdx) => {
+                if (keyword === '|') {
+                    const separator = document.createElement('span');
+                    separator.className = 'keyword-separator';
+                    separator.textContent = '|';
+                    keywordsDiv.appendChild(separator);
+                    return;
+                }
+
                 const tag = document.createElement('span');
                 tag.className = 'keyword-tag';
                 tag.textContent = keyword;
@@ -258,7 +304,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Mark as downloaded if images exist for this keyword
                 const isDownloaded = (segment.downloaded_keywords && segment.downloaded_keywords.includes(keyword)) || 
                                      (segment.images && segment.images.some(img => 
-                                        img.toLowerCase().includes(keyword.toLowerCase().replace(/ /g, '_'))
+                                        (img.keyword && img.keyword.toLowerCase() === keyword.toLowerCase()) ||
+                                        (typeof img === 'string' && img.toLowerCase().includes(keyword.toLowerCase().replace(/ /g, '_'))) ||
+                                        (img.path && img.path.toLowerCase().includes(keyword.toLowerCase().replace(/ /g, '_')))
                                      ));
                 if (isDownloaded) tag.classList.add('downloaded');
 
@@ -301,67 +349,91 @@ document.addEventListener('DOMContentLoaded', () => {
         updateDeleteButtonVisibility();
 
         if (segment.images && segment.images.length > 0) {
-            segment.images.forEach(imgPath => {
-                const wrapper = document.createElement('div');
-                wrapper.className = 'image-wrapper';
+            const sources = {};
+            
+            segment.images.forEach(imgData => {
+                const imgPath = typeof imgData === 'string' ? imgData : imgData.path;
+                const source = (typeof imgData === 'object' ? imgData.source : 'unknown') || 'unknown';
                 
-                const circle = document.createElement('div');
-                circle.className = 'selection-circle';
-                
-                const pin = document.createElement('div');
-                pin.className = 'pin-icon';
-                pin.innerHTML = '📌';
-                pin.title = 'Pin image to this text anchor';
-                
-                const img = document.createElement('img');
-                // Ensure the path is relative to the root and handle both relative/absolute storage paths
-                let relativePath = imgPath.split('narrateImage/')[1] || imgPath;
-                if (relativePath.startsWith('/')) relativePath = relativePath.substring(1);
-                img.src = '/' + relativePath;
-                
-                wrapper.appendChild(circle);
-                wrapper.appendChild(pin);
-                wrapper.appendChild(img);
-                
-                img.style.cursor = 'zoom-in';
+                if (!sources[source]) sources[source] = [];
+                sources[source].push(imgPath);
+            });
 
-                circle.onclick = (e) => {
-                    e.stopPropagation();
-                    if (selectedImagePaths.has(imgPath)) {
-                        selectedImagePaths.delete(imgPath);
-                        wrapper.classList.remove('selected');
-                    } else {
-                        selectedImagePaths.add(imgPath);
-                        wrapper.classList.add('selected');
-                    }
-                    updateDeleteButtonVisibility();
-                };
+            // Render each source in its own box
+            Object.keys(sources).sort().forEach(source => {
+                const sourceBox = document.createElement('div');
+                sourceBox.className = `source-box source-${source}`;
+                
+                const title = document.createElement('h4');
+                title.textContent = source.charAt(0).toUpperCase() + source.slice(1);
+                sourceBox.appendChild(title);
+                
+                const grid = document.createElement('div');
+                grid.className = 'image-grid';
+                
+                sources[source].forEach(imgPath => {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'image-wrapper';
+                    
+                    const circle = document.createElement('div');
+                    circle.className = 'selection-circle';
+                    
+                    const pin = document.createElement('div');
+                    pin.className = 'pin-icon';
+                    pin.innerHTML = '📌';
+                    pin.title = 'Pin image to this text anchor';
+                    
+                    const img = document.createElement('img');
+                    let relativePath = imgPath.split('narrateImage/')[1] || imgPath;
+                    if (relativePath.startsWith('/')) relativePath = relativePath.substring(1);
+                    img.src = '/' + relativePath;
+                    
+                    wrapper.appendChild(circle);
+                    wrapper.appendChild(pin);
+                    wrapper.appendChild(img);
+                    
+                    img.style.cursor = 'zoom-in';
 
-                pin.onclick = async (e) => {
-                    e.stopPropagation();
-                    const isPinned = wrapper.classList.toggle('pinned');
-                    try {
-                        const response = await fetch('/api/pin-image', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ image_path: imgPath, pin: isPinned })
-                        });
-                        if (!response.ok) throw new Error('Failed to pin image');
-                    } catch (err) {
-                        console.error(err);
-                        wrapper.classList.toggle('pinned'); // revert
-                    }
-                };
+                    circle.onclick = (e) => {
+                        e.stopPropagation();
+                        if (selectedImagePaths.has(imgPath)) {
+                            selectedImagePaths.delete(imgPath);
+                            wrapper.classList.remove('selected');
+                        } else {
+                            selectedImagePaths.add(imgPath);
+                            wrapper.classList.add('selected');
+                        }
+                        updateDeleteButtonVisibility();
+                    };
 
-                img.onclick = (e) => {
-                    e.stopPropagation();
-                    console.log('Image clicked, opening modal:', img.src);
-                    imageModal.style.display = "block";
-                    modalImg.src = img.src;
-                    modalCaption.innerHTML = imgPath.split('/').pop();
-                };
+                    pin.onclick = async (e) => {
+                        e.stopPropagation();
+                        const isPinned = wrapper.classList.toggle('pinned');
+                        try {
+                            const response = await fetch('/api/pin-image', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ image_path: imgPath, pin: isPinned })
+                            });
+                            if (!response.ok) throw new Error('Failed to pin image');
+                        } catch (err) {
+                            console.error(err);
+                            wrapper.classList.toggle('pinned'); // revert
+                        }
+                    };
 
-                rightSidebarImages.appendChild(wrapper);
+                    img.onclick = (e) => {
+                        e.stopPropagation();
+                        imageModal.style.display = "block";
+                        modalImg.src = img.src;
+                        modalCaption.innerHTML = imgPath.split('/').pop();
+                    };
+
+                    grid.appendChild(wrapper);
+                });
+                
+                sourceBox.appendChild(grid);
+                rightSidebarImages.appendChild(sourceBox);
             });
         } else {
             rightSidebarImages.innerHTML = '<p style="color: var(--status-text); font-style: italic;">No images downloaded for this segment yet. Click keywords to download.</p>';
@@ -406,12 +478,15 @@ document.addEventListener('DOMContentLoaded', () => {
             // Update local state
             if (activeSegmentIndex !== -1) {
                 processedSegments[activeSegmentIndex].images = processedSegments[activeSegmentIndex].images.filter(
-                    img => !data.deleted.includes(img)
+                    img => {
+                        const path = typeof img === 'string' ? img : img.path;
+                        return !data.deleted.includes(path);
+                    }
                 );
                 showImages(activeSegmentIndex);
                 renderSegments(); // Re-render to update keyword tag colors if needed
             }
-            setStatus(`Deleted ${data.deleted.length} images.`);
+            setStatus(`Deleted ${data.deleted.length} images.`, false, true);
         } catch (err) {
             setStatus('Error deleting images: ' + err.message);
         }
