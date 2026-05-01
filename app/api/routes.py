@@ -77,7 +77,7 @@ async def get_script_response(filename: str):
     stem = Path(filename).stem
     response_file = RESPONSES_DIR / f"{stem}.json"
     if not response_file.exists():
-        raise HTTPException(status_code=404, detail=f"No cached response found at {response_file}")
+        return []
     with open(response_file, "r") as f:
         data = json.load(f)
         segments = data.get("segments", data) if isinstance(data, dict) else data

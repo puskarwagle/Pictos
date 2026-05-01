@@ -143,3 +143,28 @@ def test_download_keyword_images(client, mock_scrapers, test_db, tmp_path, monke
     # Verify image record created
     cursor.execute("SELECT COUNT(*) FROM images WHERE anchor_id = 'anchor1'")
     assert cursor.fetchone()[0] == 1
+
+def test_get_script_response_no_cache(client, tmp_path, monkeypatch):
+    responses_dir = tmp_path / "ai_responses"
+    responses_dir.mkdir()
+    monkeypatch.setattr(config, "RESPONSES_DIR", responses_dir)
+    monkeypatch.setattr(routes, "RESPONSES_DIR", responses_dir)
+    
+    response = client.get("/api/script/non_existent.md/response")
+    assert response.status_code == 200
+    assert response.json() == []
+
+def test_get_script_response_with_cache(client, tmp_path, monkeypatch):
+    responses_dir = tmp_path / "ai_responses"
+    responses_dir.mkdir()
+    monkeypatch.setattr(config, "RESPONSES_DIR", responses_dir)
+    monkeypatch.setattr(routes, "RESPONSES_DIR", responses_dir)
+    
+    cache_data = {"segments": [{"text": "Hello world"}]}
+    (responses_dir / "test_script.json").write_text(json.dumps(cache_data))
+    
+    monkeypatch.setattr("app.api.routes.attach_images_to_segments", lambda segments, filename: segments)
+    
+    response = client.get("/api/script/test_script.md/response")
+    assert response.status_code == 200
+    assert response.json() == [{"text": "Hello world"}]
