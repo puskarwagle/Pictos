@@ -62,12 +62,14 @@ def mock_deepseek(monkeypatch):
     monkeypatch.setattr(main, "client", mock_client)
     return mock_client
 
+from unittest.mock import AsyncMock
+
 @pytest.fixture
 def mock_scraper(monkeypatch):
     """Mocks Pinterest scraper functions."""
     import main
-    mock_get = MagicMock(return_value=["http://example.com/img1.jpg"])
+    mock_get = AsyncMock(return_value=["http://example.com/img1.jpg"])
     mock_download = MagicMock()
-    monkeypatch.setattr(main, "get_pinterest_images", mock_get)
+    monkeypatch.setattr(main, "get_pinterest_images_async", mock_get)
     monkeypatch.setattr(main, "download_images", mock_download)
     return {"get": mock_get, "download": mock_download}

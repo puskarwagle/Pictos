@@ -59,7 +59,13 @@ async def get_image_urls(url, num_images=10, scroll_attempts_limit=250, headless
 def download_image(img_url, output_path):
     """Download a single image from `img_url` to `output_path`."""
     try:
-        urllib.request.urlretrieve(img_url, output_path)
+        req = urllib.request.Request(
+            img_url,
+            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'}
+        )
+        with urllib.request.urlopen(req) as response, open(output_path, 'wb') as out_file:
+            import shutil
+            shutil.copyfileobj(response, out_file)
         print(f"Downloaded: {output_path.name}", end="\r")
     except Exception as e:
         print(f"Error downloading {output_path.name}: {e}")

@@ -3,6 +3,7 @@ import json
 import asyncio
 from typing import List, Optional
 from fastapi import FastAPI, HTTPException, UploadFile, File
+import time
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
@@ -14,6 +15,8 @@ from pathlib import Path
 import difflib
 import hashlib
 from db import init_db, get_db, hash_content, generate_id, can_delete_file
+from providers import PROVIDERS, API_PROVIDERS
+import httpx
 
 load_dotenv()
 
@@ -69,7 +72,8 @@ def find_or_create_anchor(conn, script_id: str, content: str):
 # Configure DeepSeek client
 client = OpenAI(
     api_key=os.getenv("DEEPSEEK_API_KEY"),
-    base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+    base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
+    timeout=300.0  # Increased timeout for long scripts
 )
 
 # Ensure directories exist
@@ -99,7 +103,10 @@ def attach_images_to_segments(segments: List[dict], filename: str):
     if USE_DB_READ:
         conn = get_db()
         cursor = conn.cursor()
-        for segment in segments:
+        for i, segment in enumerate(segments):
+            if not isinstance(segment, dict):
+                print(f"Warning: segment is not a dict: {segment}")
+                continue
             # Match by content hash (preferred) or fuzzy match if we want to be more resilient
             content = segment.get("text", "")
             content_hash = hash_content(content)
@@ -148,12 +155,13 @@ def attach_images_to_segments(segments: List[dict], filename: str):
     else:
         # Legacy filesystem scanning
         script_stem = Path(filename).stem
-        for segment in segments:
+        for i, segment in enumerate(segments):
             images = []
             downloaded_keywords = []
             if "keywords" in segment:
                 # Strictly use the structured hierarchy: downloaded_images/script_name/segment_no/*/
-                segment_base_dir = DOWNLOAD_DIR / script_stem / str(segment["id"])
+                seg_id = segment.get("id", i)
+                segment_base_dir = DOWNLOAD_DIR / script_stem / str(seg_id)
                 if segment_base_dir.exists():
                     for kw_dir in segment_base_dir.iterdir():
                         if kw_dir.is_dir():
@@ -203,7 +211,8 @@ async def call_ai(prompt: str):
             {"role": "system", "content": "You are a helpful assistant that extracts visual keywords from scripts. Output strictly valid JSON."},
             {"role": "user", "content": prompt}
         ],
-        response_format={"type": "json_object"}
+        response_format={"type": "json_object"},
+        max_tokens=8192  # Increased for long scripts
     )
     return json.loads(response.choices[0].message.content)
 
@@ -211,16 +220,14 @@ async def call_ai(prompt: str):
 async def process_script(request: ProcessRequest):
     try:
         if request.source == "both":
+            print(f"Processing script with BOTH sources: {request.filename}")
             with open("prompt_pinterest.txt", "r") as f:
                 p_pin = f.read()
             with open("prompt_unsplash.txt", "r") as f:
                 p_uns = f.read()
             
-            t_pin = string.Template(p_pin.replace("{script_text}", "$script_text"))
-            t_uns = string.Template(p_uns.replace("{script_text}", "$script_text"))
-            
-            prompt_pin = t_pin.substitute(script_text=request.script_text)
-            prompt_uns = t_uns.substitute(script_text=request.script_text)
+            prompt_pin = p_pin.replace("{script_text}", request.script_text)
+            prompt_uns = p_uns.replace("{script_text}", request.script_text)
             
             # Parallel calls
             res_pin, res_uns = await asyncio.gather(call_ai(prompt_pin), call_ai(prompt_uns))
@@ -241,12 +248,12 @@ async def process_script(request: ProcessRequest):
                 })
             result = {"segments": merged_segments}
         else:
+            print(f"Processing script with {request.source}: {request.filename}")
             prompt_file = "prompt_pinterest.txt" if request.source == "pinterest" else "prompt_unsplash.txt"
             with open(prompt_file, "r") as f:
                 prompt_template = f.read()
             
-            t = string.Template(prompt_template.replace("{script_text}", "$script_text"))
-            prompt = t.substitute(script_text=request.script_text)
+            prompt = prompt_template.replace("{script_text}", request.script_text)
             result = await call_ai(prompt)
 
         # Save the AI response to a file (legacy fallback)
@@ -310,6 +317,8 @@ async def process_script(request: ProcessRequest):
 
         return attach_images_to_segments(segments, request.filename)
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 class KeywordDownloadRequest(BaseModel):
@@ -358,10 +367,12 @@ async def download_keyword_images(request: KeywordDownloadRequest):
         raise HTTPException(status_code=404, detail="Segment not found in database. Process script first.")
     
     anchor_id, script_id = row[0], row[1]
+    conn.close()
     
     # 2. Scrape
     try:
         source_urls = [] # list of (url, source_name)
+        total_downloaded_bytes = 0
         
         async with BROWSER_SEMAPHORE:
             if request.source == "pinterest":
@@ -385,6 +396,8 @@ async def download_keyword_images(request: KeywordDownloadRequest):
             
             loop = asyncio.get_running_loop()
             for url, img_source in source_urls:
+                conn = get_db()
+                cursor = conn.cursor()
                 # Step 1: Pre-download URL Dedup
                 cursor.execute("""
                     SELECT file_path, content_hash FROM images 
@@ -401,7 +414,10 @@ async def download_keyword_images(request: KeywordDownloadRequest):
                         VALUES (?, ?, ?, ?, ?, ?, ?)
                     """, (img_uuid, anchor_id, existing_path, request.keyword, url, img_source, existing_hash))
                     new_images.append({"path": existing_path, "source": img_source, "keyword": request.keyword})
+                    conn.commit()
+                    conn.close()
                     continue
+                conn.close()
 
                 # Step 2: Download and Content Hash Dedup
                 img_uuid = generate_id()
@@ -411,6 +427,10 @@ async def download_keyword_images(request: KeywordDownloadRequest):
                 await loop.run_in_executor(None, download_image, url, file_path)
                 
                 if file_path.exists():
+                    conn = get_db()
+                    cursor = conn.cursor()
+                    img_size = file_path.stat().st_size
+                    total_downloaded_bytes += img_size
                     img_hash = get_image_hash(file_path)
                     
                     # Check for content hash match
@@ -439,19 +459,145 @@ async def download_keyword_images(request: KeywordDownloadRequest):
                             VALUES (?, ?, ?, ?, ?, ?, ?)
                         """, (img_uuid, anchor_id, path_str, request.keyword, url, img_source, img_hash))
                         new_images.append({"path": path_str, "source": img_source, "keyword": request.keyword})
+                    conn.commit()
+                    conn.close()
                 else:
                     print(f"Failed to download image from {url}")
             
-            conn.commit()
-            conn.close()
-            return {"images": new_images}
+            return {"images": new_images, "downloaded_bytes": total_downloaded_bytes}
             
-        conn.close()
-        return {"images": []}
+        return {"images": [], "downloaded_bytes": 0}
     except Exception as e:
-        print(f"Error scraping for keyword {request.keyword}: {e}")
+        print(f"Error scraping for keyword {request.keyword}: {type(e).__name__} - {e}")
         if conn: conn.close()
         raise HTTPException(status_code=500, detail=str(e))
+
+class ApiFetchRequest(BaseModel):
+    filename: str
+    segment_id: int
+    keyword: str
+    provider: str
+
+@app.post("/api/fetch")
+async def fetch_api_images(request: ApiFetchRequest):
+    """Fetch images from API-based providers (no browser needed)."""
+    if request.provider not in PROVIDERS:
+        raise HTTPException(status_code=400, detail=f"Unknown provider: {request.provider}")
+
+    # 1. Get anchor_id from DB (same lookup as download-keyword-images)
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT s.anchor_id, sc.id as script_id
+        FROM segments s
+        JOIN scripts sc ON s.script_id = sc.id
+        WHERE sc.filename = ? AND s.ai_index = ?
+        ORDER BY s.created_at DESC LIMIT 1
+    """, (request.filename, request.segment_id))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Segment not found in database. Process script first.")
+
+    anchor_id, script_id = row[0], row[1]
+    conn.close()
+
+    # 2. Call provider search
+    try:
+        search_fn = PROVIDERS[request.provider]
+        search_results = await search_fn(request.keyword, count=3)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Provider {request.provider} error: {e}")
+
+    # 3. Download and store images
+    new_images = []
+    total_downloaded_bytes = 0
+    script_dir = DOWNLOAD_DIR / script_id
+    script_dir.mkdir(parents=True, exist_ok=True)
+
+    async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as http_client:
+        for result in search_results:
+            source_url = result["url"]
+
+            conn = get_db()
+            cursor = conn.cursor()
+            # Pre-download URL dedup
+            cursor.execute("""
+                SELECT file_path, content_hash FROM images
+                WHERE source_url = ? AND status != 'deleted'
+                LIMIT 1
+            """, (source_url,))
+            existing = cursor.fetchone()
+
+            if existing:
+                existing_path, existing_hash = existing[0], existing[1]
+                img_uuid = generate_id()
+                cursor.execute("""
+                    INSERT INTO images (id, anchor_id, file_path, keyword, source_url, source, content_hash, provider, api_type)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (img_uuid, anchor_id, existing_path, request.keyword, source_url,
+                       result["source"], existing_hash, request.provider, "api"))
+                new_images.append({"path": existing_path, "source": result["source"], "keyword": request.keyword})
+                conn.commit()
+                conn.close()
+                continue
+            conn.close()
+
+            # Download the image
+            img_uuid = generate_id()
+            # Determine file extension from URL or default to .png
+            ext = ".png"
+            if ".jpg" in source_url or ".jpeg" in source_url:
+                ext = ".jpg"
+            elif ".svg" in source_url:
+                ext = ".svg"
+            file_path = script_dir / f"{img_uuid}{ext}"
+            path_str = file_path.as_posix()
+
+            try:
+                resp = await http_client.get(source_url)
+                resp.raise_for_status()
+                img_data = resp.content
+                file_path.write_bytes(img_data)
+            except Exception as e:
+                print(f"Failed to download {source_url}: {type(e).__name__} - {e}")
+                continue
+
+            if file_path.exists():
+                conn = get_db()
+                cursor = conn.cursor()
+                img_size = file_path.stat().st_size
+                total_downloaded_bytes += img_size
+                img_hash = get_image_hash(file_path)
+
+                # Content hash dedup
+                cursor.execute("""
+                    SELECT file_path FROM images
+                    WHERE content_hash = ? AND status != 'deleted'
+                    LIMIT 1
+                """, (img_hash,))
+                hash_match = cursor.fetchone()
+
+                if hash_match:
+                    match_path = hash_match[0]
+                    os.remove(file_path)
+                    cursor.execute("""
+                        INSERT INTO images (id, anchor_id, file_path, keyword, source_url, source, content_hash, provider, api_type)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (img_uuid, anchor_id, match_path, request.keyword, source_url,
+                           result["source"], img_hash, request.provider, "api"))
+                    new_images.append({"path": match_path, "source": result["source"], "keyword": request.keyword})
+                else:
+                    cursor.execute("""
+                        INSERT INTO images (id, anchor_id, file_path, keyword, source_url, source, content_hash, provider, api_type)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (img_uuid, anchor_id, path_str, request.keyword, source_url,
+                           result["source"], img_hash, request.provider, "api"))
+                    new_images.append({"path": path_str, "source": result["source"], "keyword": request.keyword})
+                conn.commit()
+                conn.close()
+
+    return {"images": new_images, "downloaded_bytes": total_downloaded_bytes}
 
 class PinImageRequest(BaseModel):
     image_path: str

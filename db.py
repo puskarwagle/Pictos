@@ -8,7 +8,8 @@ from datetime import datetime
 DB_PATH = Path("narrateimage.db")
 
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=15.0)
+    conn.execute("PRAGMA journal_mode=WAL")
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -67,6 +68,14 @@ def init_db():
         
         try:
             conn.execute("ALTER TABLE images ADD COLUMN source TEXT")
+        except sqlite3.OperationalError: pass
+
+        try:
+            conn.execute("ALTER TABLE images ADD COLUMN provider TEXT DEFAULT 'unknown'")
+        except sqlite3.OperationalError: pass
+
+        try:
+            conn.execute("ALTER TABLE images ADD COLUMN api_type TEXT DEFAULT 'scraper'")
         except sqlite3.OperationalError: pass
 
 def generate_id():
