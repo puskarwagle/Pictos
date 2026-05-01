@@ -5,7 +5,12 @@ NarrateImage is a specialized tool for video creators (AI creators, documentary 
 ## Core Features
 
 - **Interactive Script Analysis**: Breaks your script into meaningful segments with AI-generated visual keywords.
-- **Multi-Source Scraping**: Support for **Pinterest** (great for diagrams and infographics) and **Unsplash** (ideal for high-quality photography). Use both simultaneously for comprehensive asset gathering.
+- **Multi-Source Scraping & APIs**: 
+    - **Browser Scrapers**: Support for **Pinterest** (great for diagrams and infographics) and **Unsplash** (ideal for high-quality photography). Use both simultaneously for comprehensive asset gathering.
+    - **Free Image APIs**: Direct integration with 6 free APIs for specialized generation without browsers:
+        - **Photography**: Lorem Picsum
+        - **Archival/Museum**: NASA Images, Metropolitan Museum of Art
+        - **Avatars/Illustrations**: DiceBear, RoboHash, UI Avatars
 - **Robust Metadata Linking**: Uses a SQLite backend to anchor images to specific **text spans** (content-hashed) rather than unstable segment indices.
 - **Smart Fuzzy Matching**: If you edit your script, the system uses fuzzy string matching (92% threshold) to ensure images stay linked to their original sentences.
 - **Image Pinning**: Explicitly "lock" 📌 images to a text anchor so they survive even major script re-segmentations.
@@ -33,17 +38,22 @@ NarrateImage is a specialized tool for video creators (AI creators, documentary 
 - `garbage_collect.py`: Maintenance utility to purge orphaned or deleted images older than a set TTL (default 30 days).
 - `pinterest_scraper.py`: Scrapes Pinterest using Camoufox.
 - `unsplash_scraper.py`: Scrapes Unsplash photography using Camoufox.
-- `prompt_pinterest.txt`: Optimized prompt for generating diagram/infographic keywords.
-- `prompt_unsplash.txt`: Optimized prompt for generating photography-focused keywords.
-
 ### Directories
+- `providers/`: Modular integrations for the 6 free image APIs (`nasa_api.py`, `dicebear_api.py`, etc.).
 - `video-scripts/`: Place your `.md` script files here.
 - `downloaded_images/`: Managed storage. Files are named with UUIDs and organized by script ID.
 - `ai_responses/`: Legacy JSON cache of AI analyses (maintained as backup).
-- `tests/`: Comprehensive test suite for backend and database logic.
+- `tests/`: Comprehensive test suite for backend, API integrations, and database logic.
 - `static/`:
-    - `script.js`: UI logic, pinning interactions, and download queue management.
+    - `script.js`: UI logic, pinning interactions, API vs Scraper routing, and download queue management.
     - `style.css`: Modern styling with CSS variables.
+
+### Text Prompts
+- `prompt_pinterest.txt`: Optimized prompt for generating diagram/infographic keywords.
+- `prompt_unsplash.txt` / `prompt_photography.txt`: Optimized prompts for generating photography-focused keywords.
+- `prompt_illustration.txt`: Optimized prompt for vector art.
+- `prompt_avatar.txt`: Optimized prompt for generating precise semantic seeds for avatars.
+- `prompt_archival.txt`: Optimized prompt for literal search terms for museum/scientific objects.
 
 ## Setup Instructions
 
@@ -64,7 +74,7 @@ USE_DB_READ=true
 1. Place a markdown script in `video-scripts/`.
 2. Start the server: `python main.py`.
 3. Open `http://localhost:8000`.
-4. Select your script and choose an **Image Source** (Pinterest, Unsplash, or Both).
+4. Select your script and choose an **Image Source** from the dropdown menu (e.g., Pinterest, NASA Images, DiceBear Avatars).
 5. Click **"Process with AI"**.
 6. **Pin Images**: Click the 📌 icon on an image to lock it to that sentence.
 7. **Maintenance**: Run `python garbage_collect.py --no-dry-run` to clean up old deleted assets.
