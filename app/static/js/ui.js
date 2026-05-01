@@ -33,23 +33,19 @@ export const elements = {
 };
 
 /**
- * Gets the currently selected image sources from the checkboxes.
- * @returns {string[]} Array of source names.
+ * Determines the primary source for AI processing logic.
+ * @returns {string} The primary source name or 'both' or 'dense'.
  */
-export function getSelectedSources() {
-    const checkboxes = document.querySelectorAll('input[name="source"]:checked');
-    const sources = Array.from(checkboxes).map(cb => cb.value);
-    return sources.length > 0 ? sources : ['pinterest'];
+export function getPrimarySource() {
+    return 'dense';
 }
 
 /**
- * Determines the primary source for AI processing logic.
- * @returns {string} The primary source name or 'both'.
+ * Gets the default image sources.
+ * @returns {string[]} Array of source names.
  */
-export function getPrimarySource() {
-    const sources = getSelectedSources();
-    if (sources.includes('pinterest') && sources.includes('unsplash')) return 'both';
-    return sources[0];
+export function getSelectedSources() {
+    return ['pinterest'];
 }
 
 /**
@@ -156,7 +152,19 @@ export function renderSegments(onKeywordClick) {
 
             const tag = document.createElement('span');
             tag.className = 'keyword-tag';
-            tag.textContent = keyword;
+            
+            // Handle provider prefix e.g., "nasa: pillars of creation"
+            let displayKeyword = keyword;
+            let provider = null;
+            if (keyword.includes(':')) {
+                const parts = keyword.split(':');
+                provider = parts[0].trim();
+                displayKeyword = parts.slice(1).join(':').trim();
+                tag.setAttribute('data-provider', provider);
+                tag.classList.add(`provider-${provider}`);
+            }
+            
+            tag.textContent = displayKeyword;
 
             const isDownloaded = (segment.downloaded_keywords && segment.downloaded_keywords.includes(keyword)) || 
                                  (segment.images && segment.images.some(img => 

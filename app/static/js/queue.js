@@ -86,9 +86,15 @@ async function processQueue() {
  * @param {HTMLElement} tagElement - The DOM element representing the keyword tag.
  */
 export function queueDownload(segmentIdx, keyword, tagElement) {
-    const sources = ui.getSelectedSources();
-    sources.forEach(source => {
-        downloadQueue.push({ segmentIdx, keyword, tagElement, source });
-    });
+    // If the tag has a specific provider assigned by AI, use only that
+    const forcedProvider = tagElement.getAttribute('data-provider');
+    if (forcedProvider) {
+        downloadQueue.push({ segmentIdx, keyword, tagElement, source: forcedProvider });
+    } else {
+        const sources = ui.getSelectedSources();
+        sources.forEach(source => {
+            downloadQueue.push({ segmentIdx, keyword, tagElement, source });
+        });
+    }
     processQueue();
 }

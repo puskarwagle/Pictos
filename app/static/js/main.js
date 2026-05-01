@@ -65,6 +65,7 @@ function setupEventListeners() {
 
         try {
             ui.toggleButtons(true);
+            elements.processBtn.classList.add('loading');
             ui.setStatus('Extracting keywords with AI (DeepSeek)...', true);
             elements.segmentsContainer.innerHTML = '';
 
@@ -76,12 +77,22 @@ function setupEventListeners() {
             
             state.processedSegments = segments;
             state.isAiProcessed = true;
+            
+            // Ensure we switch out of edit mode to show the new segments
+            state.isEditMode = false;
+            elements.editModeToggle.checked = false;
+            document.body.classList.remove('edit-mode');
+            elements.scriptEditor.readOnly = true;
+            elements.editorContainer.style.display = 'none';
+            elements.segmentsContainer.style.display = 'flex';
+            
             ui.renderSegments(queueDownload);
             ui.setStatus('Keywords extracted. Click tags to download images.');
         } catch (err) {
             ui.setStatus('Error: ' + err.message);
         } finally {
             ui.toggleButtons(false);
+            elements.processBtn.classList.remove('loading');
         }
     });
 

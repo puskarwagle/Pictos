@@ -85,6 +85,34 @@
     color: white !important;
 }
 
+/* Provider Specific Tags */
+.keyword-tag[data-provider] {
+    padding-left: 0.5rem;
+    position: relative;
+    border-left: 4px solid var(--accent-color);
+    border-top-left-radius: 4px;
+    border-bottom-left-radius: 4px;
+}
+
+.keyword-tag[data-provider]::before {
+    content: attr(data-provider);
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    opacity: 0.6;
+    margin-right: 0.4rem;
+    font-weight: bold;
+    letter-spacing: 0.05em;
+    vertical-align: middle;
+}
+
+.keyword-tag.provider-nasa { border-left-color: #0b3d91 !important; }
+.keyword-tag.provider-met { border-left-color: #e4002b !important; }
+.keyword-tag.provider-unsplash { border-left-color: #000000 !important; }
+.keyword-tag.provider-pinterest { border-left-color: #bd081c !important; }
+.keyword-tag.provider-dicebear { border-left-color: #ff5a5f !important; }
+
+.dark-mode .keyword-tag.provider-unsplash { border-left-color: #ffffff !important; }
+
 @keyframes pulse {
     0% { opacity: 1; }
     50% { opacity: 0.6; }

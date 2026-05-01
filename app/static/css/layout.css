@@ -142,3 +142,53 @@
     background-color: #e60023;
     width: 6px;
 }
+
+/* Strategy Option Cards */
+.strategy-option {
+    display: block;
+    padding: 12px;
+    margin-bottom: 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.strategy-option:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.strategy-option input {
+    margin-right: 12px;
+    vertical-align: middle;
+}
+
+.strategy-option strong {
+    display: block;
+    font-size: 0.9rem;
+    color: var(--text-color);
+    margin-bottom: 2px;
+}
+
+.strategy-option small {
+    display: block;
+    font-size: 0.75rem;
+    opacity: 0.6;
+    color: var(--text-color);
+    line-height: 1.3;
+}
+
+.strategy-option input:checked + strong {
+    color: #e60023;
+}
+
+.optgroup-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    opacity: 0.5;
+    margin: 15px 0 8px 5px;
+    font-weight: bold;
+}
