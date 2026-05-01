@@ -132,12 +132,40 @@ h1 {
     width: 550px;
     flex-shrink: 0;
     background: var(--sidebar-bg);
-    border-left: 1px solid var(--sidebar-border);
     padding: 20px;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
     gap: 20px;
+}
+
+.resizer {
+    width: 8px;
+    cursor: col-resize;
+    background: var(--sidebar-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    z-index: 10;
+    flex-shrink: 0;
+    transition: background 0.2s;
+}
+
+.resizer:hover, .resizer.active {
+    background: #e60023;
+}
+
+.resizer-handle {
+    width: 4px;
+    height: 40px;
+    background: var(--bg-color);
+    border-radius: 4px;
+    opacity: 0.6;
+}
+
+.resizer:hover .resizer-handle, .resizer.active .resizer-handle {
+    opacity: 1;
 }
 
 .sidebar h3 {
