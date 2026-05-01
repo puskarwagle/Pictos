@@ -6,14 +6,17 @@ __pycache__/
 venv/
 ENV/
 .env
+.pytest_cache/
 
-# Project Specific
-downloaded_images/
-ai_responses/*.json
-video_scripts/*
+# Project Specific Data
+data/downloaded_images/
+data/ai_responses/
+data/video_scripts/
+reconciliation_report.json
 docs/
 
-server.log
+# Logs
+*.log
 nohup.out
 
 # OS
@@ -23,8 +26,12 @@ Thumbs.db
 # Playwright
 .auth/
 browser-data/
-video-scripts/
 
-# Database and Reports
-narrateimage.db
-reconciliation_report.json
+# Database
+*.db
+*.db-shm
+*.db-wal
+
+# IDE
+.vscode/
+.idea/
