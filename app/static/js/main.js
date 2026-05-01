@@ -216,10 +216,14 @@ async function selectScript(filename) {
 function setupResizer() {
     const { resizer, rightSidebar } = elements;
     let isResizing = false;
+    let startX, startWidth;
 
     if (resizer && rightSidebar) {
-        resizer.addEventListener('mousedown', () => {
+        resizer.addEventListener('mousedown', (e) => {
             isResizing = true;
+            startX = e.clientX;
+            startWidth = parseInt(document.defaultView.getComputedStyle(rightSidebar).width, 10);
+            
             document.body.style.cursor = 'col-resize';
             document.body.style.userSelect = 'none';
             resizer.classList.add('active');
@@ -228,7 +232,8 @@ function setupResizer() {
         document.addEventListener('mousemove', (e) => {
             if (!isResizing) return;
 
-            let newWidth = window.innerWidth - e.clientX;
+            // Calculate new width based on mouse movement delta
+            let newWidth = startWidth + (startX - e.clientX);
             const maxWidth = window.innerWidth * 0.5;
             const minWidth = 200;
             

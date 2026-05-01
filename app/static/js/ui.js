@@ -118,7 +118,7 @@ export function showScriptsList() {
     elements.activeScriptHeader.style.display = 'none';
     elements.editorContainer.style.display = 'none';
     elements.segmentsContainer.innerHTML = '';
-    elements.rightSidebarImages.innerHTML = '<p style="color: var(--status-text); font-style: italic;">Select a segment to view images.</p>';
+    elements.rightSidebarImages.innerHTML = '<p>Select a segment to view images.</p>';
     setStatus('Select a script to begin.');
 }
 
@@ -290,7 +290,7 @@ export function showImages(idx) {
             elements.rightSidebarImages.appendChild(sourceBox);
         });
     } else {
-        elements.rightSidebarImages.innerHTML = '<p style="color: var(--status-text); font-style: italic;">No images downloaded for this segment yet. Click keywords to download.</p>';
+        elements.rightSidebarImages.innerHTML = '<p>No images downloaded for this segment yet. Click keywords to download.</p>';
     }
 }
 
