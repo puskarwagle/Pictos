@@ -1,0 +1,53 @@
+:root {
+    --bg-color: #f4f4f9;
+    --text-color: #333;
+    --sidebar-bg: rgba(255, 255, 255, 0.85);
+    --sidebar-border: #ddd;
+    --content-area-bg: rgba(253, 253, 253, 0.85);
+    --tile-bg: rgba(250, 250, 250, 0.8);
+    --tile-border: #eee;
+    --tile-hover-bg: rgba(255, 245, 246, 0.9);
+    --editor-bg: rgba(255, 255, 255, 0.9);
+    --editor-border: #ccc;
+    --editor-text: #333;
+    --status-bg: rgba(238, 238, 238, 0.8);
+    --status-text: #555;
+    --card-bg: rgba(255, 255, 255, 0.85);
+    --card-border: #eee;
+    --keyword-bg: rgba(240, 240, 240, 0.8);
+    --keyword-text: #444;
+
+    /* Soft Palette - Light (More transparent) */
+    --seg-color-1: rgba(227, 242, 253, 0.7);
+    --seg-color-2: rgba(243, 229, 245, 0.7);
+    --seg-color-3: rgba(232, 245, 233, 0.7);
+    --seg-color-4: rgba(255, 243, 224, 0.7);
+    --seg-color-5: rgba(252, 228, 236, 0.7);
+}
+
+body.dark-mode {
+    --bg-color: #121212;
+    --text-color: #e0e0e0;
+    --sidebar-bg: rgba(30, 30, 30, 0.85);
+    --sidebar-border: #333;
+    --content-area-bg: rgba(24, 24, 24, 0.85);
+    --tile-bg: rgba(42, 42, 42, 0.8);
+    --tile-border: #444;
+    --tile-hover-bg: rgba(58, 26, 30, 0.9);
+    --editor-bg: rgba(34, 34, 34, 0.9);
+    --editor-border: #444;
+    --editor-text: #e0e0e0;
+    --status-bg: rgba(51, 51, 51, 0.8);
+    --status-text: #ccc;
+    --card-bg: rgba(42, 42, 42, 0.85);
+    --card-border: #444;
+    --keyword-bg: rgba(68, 68, 68, 0.8);
+    --keyword-text: #ddd;
+
+    /* Soft Palette - Dark */
+    --seg-color-1: rgba(26, 35, 126, 0.3);
+    --seg-color-2: rgba(74, 20, 140, 0.3);
+    --seg-color-3: rgba(27, 94, 32, 0.3);
+    --seg-color-4: rgba(230, 81, 0, 0.3);
+    --seg-color-5: rgba(136, 14, 79, 0.3);
+}

@@ -1,0 +1,144 @@
+.main-layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    min-height: 0;
+}
+
+.sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    background: var(--sidebar-bg);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-right: 1px solid var(--sidebar-border);
+    border-left: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 15px 10px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-height: 0;
+}
+
+#activeScriptHeader {
+    display: none;
+    align-items: center;
+    gap: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+#selectedScriptName {
+    margin: 0;
+    flex: 1;
+    font-size: 1rem;
+    font-weight: 500;
+    word-break: break-all;
+    color: var(--text-color);
+}
+
+#scriptActions {
+    display: none;
+}
+
+.content-area {
+    flex: 1;
+    padding: 0px;
+    margin: 0 5px 0 10px;
+    overflow-y: auto;
+    background: var(--content-area-bg, #fdfdfd);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    border-left: 1px solid rgba(255, 255, 255, 0.05);
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
+    min-width: 400px;
+    min-height: 0;
+}
+
+.editor-section {
+    margin-bottom: 20px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+#editorContainer {
+    display: none;
+}
+
+#scriptEditor {
+    flex: 1;
+    width: 100%;
+    padding: 15px;
+    border: 1px solid var(--editor-border);
+    border-radius: 12px;
+    background: var(--editor-bg);
+    color: var(--editor-text);
+    font-family: inherit;
+    font-size: 1rem;
+    resize: vertical;
+    outline: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+#scriptEditor:focus {
+    border-color: #e60023;
+    box-shadow: 0 0 0 3px rgba(230, 0, 35, 0.1);
+}
+
+.right-sidebar {
+    width: 550px;
+    flex-shrink: 0;
+    background: var(--sidebar-bg);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-left: 1px solid var(--sidebar-border);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-height: 0;
+}
+
+.resizer {
+    width: 12px;
+    cursor: col-resize;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    z-index: 10;
+    flex-shrink: 0;
+    margin-right: -6px;
+}
+
+.resizer-handle {
+    width: 4px;
+    height: 48px;
+    background-color: rgba(200, 200, 200, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.8;
+    transition: all 0.2s;
+}
+
+.resizer-handle::before {
+    content: "";
+    width: 2px;
+    height: 18px;
+    background-image: radial-gradient(circle, rgba(255,255,255,0.5) 1px, transparent 1px);
+    background-size: 2px 6px;
+}
+
+.resizer:hover .resizer-handle, .resizer.active .resizer-handle {
+    opacity: 1;
+    background-color: #e60023;
+    width: 6px;
+}

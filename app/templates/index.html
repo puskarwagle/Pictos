@@ -4,17 +4,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NarrateImage - AI Image Suggester</title>
+    <link rel="icon" type="image/png" href="/static/favicon-96x96.png" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+    <link rel="shortcut icon" href="/static/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="NarrateImage" />
+    <link rel="manifest" href="/static/site.webmanifest" />
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
     <div class="container-fluid">
-        <h1>NarrateImage</h1>
+        <!-- <header class="app-header"> -->
+            <!-- <img src="/static/favicon.svg" alt="NarrateImage Logo" class="app-logo"> -->
+            <!-- <h1>NarrateImage</h1> -->
+        <!-- </header> -->
         
         <div class="main-layout">
-            <div class="sidebar">
-                <div id="activeScriptHeader" style="display: none; align-items: center; gap: 15px; margin-bottom: 20px;">
+            <aside class="sidebar">
+                <div id="activeScriptHeader">
                     <button id="backBtn" class="secondary-btn icon-btn" title="Back to List"><span>&larr;</span></button>
-                    <h3 id="selectedScriptName" style="margin: 0; flex: 1; font-size: 1.2rem; word-break: break-all;"></h3>
+                    <h3 id="selectedScriptName"></h3>
                 </div>
 
                 <div id="scriptsListContainer" class="sidebar-card">
@@ -24,7 +33,7 @@
                     </div>
                 </div>
 
-                <div id="scriptActions" style="display: none;">
+                <div id="scriptActions">
                     <div class="sidebar-controls">
                         <div class="control-group">
                             <div class="platform-selector">
@@ -51,7 +60,7 @@
                     </div>
                 </div>
 
-                <div class="settings-card sidebar-card" style="margin-top: auto;">
+                <div class="settings-card sidebar-card">
                     <div class="toggle-container">
                         <span class="toggle-label">Edit Mode</span>
                         <label class="switch">
@@ -67,31 +76,31 @@
                         </label>
                     </div>
                 </div>
-            </div>
+            </aside>
 
-            <div class="content-area" id="contentArea">
-                <div id="editorContainer" class="editor-section" style="display: none;">
+            <main class="content-area" id="contentArea">
+                <div id="editorContainer" class="editor-section">
                     <textarea id="scriptEditor" placeholder="Script content will appear here..."></textarea>
                 </div>
 
                 <div id="segmentsContainer" class="segments-container">
                     <!-- Segment blocks will be injected here -->
                 </div>
-            </div>
+            </main>
 
             <div id="resizer" class="resizer">
                 <div class="resizer-handle"></div>
             </div>
 
-            <div class="right-sidebar" id="rightSidebar">
+            <aside class="right-sidebar" id="rightSidebar">
                 <div class="sidebar-header sidebar-card" id="rightSidebarHeader">
-                    <div id="statusMessage" style="color: var(--status-text); font-size: 0.9rem; font-weight: normal; margin: 0; min-height: 1.2rem; flex: 1;">Ready</div>
-                    <button id="deleteSelectedBtn" class="delete-btn" style="display: none;">Delete Selected</button>
+                    <div id="statusMessage">Ready</div>
+                    <button id="deleteSelectedBtn" class="delete-btn">Delete Selected</button>
                 </div>
-                <div id="rightSidebarImages" class="right-sidebar-images" style="padding: 5px;">
-                    <p style="color: var(--status-text); font-style: italic; text-align: center;">Select a segment to view images.</p>
+                <div id="rightSidebarImages" class="right-sidebar-images">
+                    <p>Select a segment to view images.</p>
                 </div>
-            </div>
+            </aside>
         </div>
     </div>
     <div id="imageModal" class="modal">
