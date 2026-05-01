@@ -179,6 +179,30 @@ body.dark-mode .sidebar-card {
     padding: 5px 0;
 }
 
+.source-checkbox-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 0 5px;
+}
+
+.optgroup-label {
+    margin-top: 10px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--status-text);
+    text-transform: uppercase;
+}
+
+.source-checkbox-group label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+    color: var(--text-color);
+    cursor: pointer;
+}
+
 .platform-option {
     display: flex;
     align-items: center;
@@ -647,6 +671,10 @@ body.dark-mode .toast {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 10px;
+}
+
+#rightSidebarHeader {
+    padding: 8px 12px;
 }
 
 .delete-btn {

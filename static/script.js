@@ -15,11 +15,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
     const editModeToggle = document.getElementById('editModeToggle');
 
-    const getSelectedSource = () => {
-        const checked = Array.from(document.querySelectorAll('input[name="platform"]:checked')).map(cb => cb.value);
-        if (checked.length === 2) return 'both';
-        if (checked.length === 1) return checked[0];
-        return 'pinterest'; // Default fallback
+    const API_PROVIDERS = new Set(["picsum", "dicebear", "robohash", "uiavatars", "nasa", "met"]);
+
+    const getSelectedSources = () => {
+        const checkboxes = document.querySelectorAll('input[name="source"]:checked');
+        const sources = Array.from(checkboxes).map(cb => cb.value);
+        return sources.length > 0 ? sources : ['pinterest'];
+    };
+
+    const getPrimarySource = () => {
+        const sources = getSelectedSources();
+        if (sources.includes('pinterest') && sources.includes('unsplash')) return 'both';
+        return sources[0];
     };
 
     // Modal elements
@@ -31,8 +38,18 @@ document.addEventListener('DOMContentLoaded', () => {
     let selectedScript = null;
     let processedSegments = [];
     let isEditMode = false;
+    let isAiProcessed = false;
     let activeSegmentIndex = -1;
     let selectedImagePaths = new Set();
+
+    function createDefaultSegments(text) {
+        return text.split(/\n\s*\n/).filter(p => p.trim()).map((p, i) => ({
+            id: i,
+            text: p.trim(),
+            keywords: [],
+            images: []
+        }));
+    }
 
     // Concurrency Queue for Keyword Downloads
     const MAX_CONCURRENT_DOWNLOADS = 4;
@@ -49,19 +66,35 @@ document.addEventListener('DOMContentLoaded', () => {
             tagElement.classList.add('downloading');
             tagElement.classList.remove('downloaded');
             
-            const response = await fetch('/api/download-keyword-images', {
+            const statusMsg = document.getElementById('statusMessage');
+            if (statusMsg) {
+                statusMsg.textContent = `Scraping & downloading: ${keyword}...`;
+            }
+            const startTime = performance.now();
+            
+            const isApiProvider = API_PROVIDERS.has(source);
+            const endpoint = isApiProvider ? '/api/fetch' : '/api/download-keyword-images';
+            const bodyPayload = isApiProvider
+                ? { filename: selectedScript, segment_id: processedSegments[segmentIdx].id, keyword, provider: source }
+                : { filename: selectedScript, segment_id: processedSegments[segmentIdx].id, keyword, source };
+
+            const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    filename: selectedScript,
-                    segment_id: processedSegments[segmentIdx].id,
-                    keyword: keyword,
-                    source: source
-                })
+                body: JSON.stringify(bodyPayload)
             });
 
             if (!response.ok) throw new Error('Download failed');
             const data = await response.json();
+            
+            const endTime = performance.now();
+            if (statusMsg) {
+                const timeSec = (endTime - startTime) / 1000;
+                const kb = (data.downloaded_bytes || 0) / 1024;
+                const speed = timeSec > 0 ? (kb / timeSec).toFixed(1) : 0;
+                const numImages = data.images ? data.images.length : 0;
+                statusMsg.textContent = `Finished "${keyword}" (${numImages} imgs), Speed: ${speed} KB/s`;
+            }
             
             // Add new images to segment and remove duplicates by path
             const currentImages = processedSegments[segmentIdx].images || [];
@@ -82,6 +115,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (activeSegmentIndex === segmentIdx) showImages(segmentIdx);
         } catch (err) {
             console.error(`Failed to download images for ${keyword}:`, err);
+            const statusMsg = document.getElementById('statusMessage');
+            if (statusMsg) {
+                statusMsg.textContent = `Error: ${keyword}`;
+            }
             setStatus(`Failed to download: ${keyword}`, false, true);
         } finally {
             tagElement.classList.remove('downloading');
@@ -91,8 +128,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function queueDownload(segmentIdx, keyword, tagElement) {
-        const source = getSelectedSource();
-        downloadQueue.push({ segmentIdx, keyword, tagElement, source });
+        const sources = getSelectedSources();
+        sources.forEach(source => {
+            downloadQueue.push({ segmentIdx, keyword, tagElement, source });
+        });
         processQueue();
     }
 
@@ -147,6 +186,9 @@ document.addEventListener('DOMContentLoaded', () => {
         segmentsContainer.style.display = isEditMode ? 'none' : 'flex';
         
         if (!isEditMode) {
+            if (!isAiProcessed) {
+                processedSegments = createDefaultSegments(scriptEditor.value);
+            }
             renderSegments(); // Refresh segments when exiting edit mode
         }
     });
@@ -215,13 +257,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 const cacheResp = await fetch(`/api/script/${filename}/response`);
                 if (cacheResp.ok) {
                     processedSegments = await cacheResp.json();
+                    isAiProcessed = true;
                     renderSegments();
                     setStatus(`Loaded: ${filename}. Cached AI response found.`, false, true);
                     setStatus('');
                 } else {
-                    setStatus('No cached response found. Click Process to start.');
+                    isAiProcessed = false;
+                    processedSegments = createDefaultSegments(scriptEditor.value);
+                    renderSegments();
+                    setStatus('No cached response found. Displaying raw script segments. Click Process to start.');
                 }
             } catch (cacheErr) {
+                isAiProcessed = false;
+                processedSegments = createDefaultSegments(scriptEditor.value);
+                renderSegments();
                 setStatus('Error checking cache.');
             }
 
@@ -254,12 +303,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({ 
                     filename: selectedScript, 
                     script_text: scriptText,
-                    source: getSelectedSource() 
+                    source: getPrimarySource() 
                 })
             });
             if (!response.ok) throw new Error('Failed to process script');
             
             processedSegments = await response.json();
+            isAiProcessed = true;
             renderSegments();
             setStatus('Keywords extracted. Click tags to download images.');
         } catch (err) {
