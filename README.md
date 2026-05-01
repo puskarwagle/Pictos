@@ -32,34 +32,25 @@ NarrateImage is a specialized tool for video creators (AI creators, documentary 
 ## File Guide
 
 ### Root Directory
-- `main.py`: The heart of the application. Manages FastAPI routes, anchor matching logic, and DB integrations.
-- `db.py`: Database schema and initialization logic.
-- `migrate_to_db.py`: Utility to migrate existing legacy folders and AI responses into the metadata store.
-- `garbage_collect.py`: Maintenance utility to purge orphaned or deleted images older than a set TTL (default 30 days).
-- `pinterest_scraper.py`: Scrapes Pinterest using Camoufox.
-- `unsplash_scraper.py`: Scrapes Unsplash photography using Camoufox.
-### Directories
-- `providers/`: Modular integrations for the 6 free image APIs (`nasa_api.py`, `dicebear_api.py`, etc.).
-- `video-scripts/`: Place your `.md` script files here.
-- `downloaded_images/`: Managed storage. Files are named with UUIDs and organized by script ID.
-- `ai_responses/`: Legacy JSON cache of AI analyses (maintained as backup).
-- `tests/`: Comprehensive test suite for backend, API integrations, and database logic.
-- `static/`:
-    - `script.js`: UI logic, pinning interactions, API vs Scraper routing, and download queue management.
-    - `style.css`: Modern styling with CSS variables.
-
-### Text Prompts
-- `prompt_pinterest.txt`: Optimized prompt for generating diagram/infographic keywords.
-- `prompt_unsplash.txt` / `prompt_photography.txt`: Optimized prompts for generating photography-focused keywords.
-- `prompt_illustration.txt`: Optimized prompt for vector art.
-- `prompt_avatar.txt`: Optimized prompt for generating precise semantic seeds for avatars.
-- `prompt_archival.txt`: Optimized prompt for literal search terms for museum/scientific objects.
+- `main.py`: Entry point for the FastAPI application.
+- `requirements.txt`: Project dependencies.
+- `app/`:
+    - `api/`: API routes (`routes.py`).
+    - `core/`: Configuration and constants (`config.py`).
+    - `db/`: Database session and repository logic (`session.py`, `repository.py`).
+    - `models/`: Pydantic models.
+    - `services/`: AI integration and image management services.
+    - `static/` & `templates/`: Frontend UI assets.
+- `data/`: Local storage for scripts, images, and AI responses (Git ignored).
+- `resources/prompts/`: AI system prompts for different visual styles.
+- `scripts/`: Maintenance utilities (`garbage_collect.py`, `migrate_to_db.py`).
+- `tests/`: Comprehensive test suite.
 
 ## Setup Instructions
 
 ### 1. Install Dependencies
 ```bash
-pip install fastapi uvicorn openai camoufox python-dotenv pytest httpx
+pip install -r requirements.txt
 ```
 
 ### 2. Configuration
@@ -71,22 +62,18 @@ USE_DB_READ=true
 ```
 
 ### 3. Usage
-1. Place a markdown script in `video-scripts/`.
+1. Place a markdown script in `data/video_scripts/`.
 2. Start the server: `python main.py`.
 3. Open `http://localhost:8000`.
-4. Select your script and choose an **Image Source** from the dropdown menu (e.g., Pinterest, NASA Images, DiceBear Avatars).
+4. Select your script and choose an **Image Source** from the dropdown menu.
 5. Click **"Process with AI"**.
-6. **Pin Images**: Click the 📌 icon on an image to lock it to that sentence.
-7. **Maintenance**: Run `python garbage_collect.py --no-dry-run` to clean up old deleted assets.
+6. **Maintenance**: Run `PYTHONPATH=. python scripts/garbage_collect.py --no-dry-run` to clean up old deleted assets.
 
 ## Testing
-The project includes a `pytest` suite to ensure database integrity and route correctness.
+The project includes a `pytest` suite.
 ```bash
 # Run all tests
-pytest
-
-# Run with output
-pytest -v
+PYTHONPATH=. pytest
 ```
 
 ## Asset Persistence Model

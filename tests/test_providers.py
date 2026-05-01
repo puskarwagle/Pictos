@@ -1,5 +1,6 @@
 import pytest
-from providers import picsum_api, dicebear_api, robohash_api, uiavatars_api, nasa_api, met_api
+from app.services.providers import picsum_api, dicebear_api, robohash_api, uiavatars_api, nasa_api, met_api
+import app.services.providers as providers
 from collections import namedtuple
 
 # Mocking httpx.AsyncClient simply
@@ -129,7 +130,6 @@ def test_fetch_endpoint(client, test_db, monkeypatch):
                    ("seg_api", "script_api", "anchor_api", 1, '["key"]'))
     test_db.commit()
 
-    import providers
     async def mock_search(query, count):
         return [{
             "url": "http://example.com/fake.png",
@@ -177,4 +177,3 @@ def test_fetch_endpoint(client, test_db, monkeypatch):
     row = cursor.fetchone()
     assert row["provider"] == "mock_provider"
     assert row["api_type"] == "api"
-

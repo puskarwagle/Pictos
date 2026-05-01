@@ -1,5 +1,7 @@
 import pytest
-from db import generate_id, hash_content, can_delete_file, init_db
+from app.db.repository import generate_id, hash_content, can_delete_file
+from app.db import session
+from app.core import config
 import sqlite3
 from pathlib import Path
 
@@ -40,13 +42,14 @@ def test_can_delete_file(test_db):
     test_db.commit()
     assert can_delete_file(file_path, test_db) is False
 
-def test_init_db(tmp_path):
+def test_init_db(tmp_path, monkeypatch):
     test_db_file = tmp_path / "new_test.db"
-    import db
-    original_path = db.DB_PATH
-    db.DB_PATH = test_db_file
     
-    db.init_db()
+    # Patch both config and session
+    monkeypatch.setattr(config, "DB_PATH", test_db_file)
+    monkeypatch.setattr(session, "DB_PATH", test_db_file)
+    
+    session.init_db()
     
     assert test_db_file.exists()
     conn = sqlite3.connect(test_db_file)
@@ -58,4 +61,3 @@ def test_init_db(tmp_path):
     assert "segments" in tables
     assert "images" in tables
     conn.close()
-    db.DB_PATH = original_path
