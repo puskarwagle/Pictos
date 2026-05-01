@@ -31,32 +31,13 @@ class AIService:
         except json.JSONDecodeError:
             pass
 
-        # Naive quote balancing
-        # We need to be careful about escaped quotes
-        quotes = 0
-        escaped = False
-        for char in json_str:
-            if char == '\\' and not escaped:
-                escaped = True
-            elif char == '"' and not escaped:
-                quotes += 1
-                escaped = False
-            else:
-                escaped = False
-        
-        if quotes % 2 != 0:
-            json_str += '"'
-
-        # Remove trailing commas or colons which would make it invalid after closing
-        json_str = json_str.rstrip()
-        while json_str and json_str[-1] in (',', ':'):
-            json_str = json_str[:-1].rstrip()
-
-        # Close open braces and brackets
+        # Track state to close properly
         stack = []
         in_string = False
         escaped = False
-        for char in json_str:
+        
+        fixed_str = ""
+        for i, char in enumerate(json_str):
             if char == '"' and not escaped:
                 in_string = not in_string
             
@@ -76,11 +57,62 @@ class AIService:
                 escaped = True
             else:
                 escaped = False
+            fixed_str += char
+
+        # If we are inside a string at the end, close it
+        if in_string:
+            fixed_str += '"'
         
-        while stack:
-            json_str += stack.pop()
+        # Iteratively remove trailing problematic characters
+        while True:
+            fixed_str = fixed_str.rstrip()
+            if not fixed_str:
+                break
             
-        return json_str
+            last_char = fixed_str[-1]
+            
+            # Remove trailing delimiters that have no following value
+            if last_char in (',', ':', '{', '['):
+                if last_char in ('{', '['):
+                    if stack: stack.pop()
+                fixed_str = fixed_str[:-1]
+                continue
+            
+            # If it ends with a quote, check if it's a key without a colon
+            # or a value that we just closed.
+            if last_char == '"':
+                # Find the start of this string
+                start_quote = -1
+                for j in range(len(fixed_str) - 2, -1, -1):
+                    if fixed_str[j] == '"':
+                        # Count backslashes before this quote to handle escapes
+                        temp_bs = 0
+                        for k in range(j-1, -1, -1):
+                            if fixed_str[k] == '\\': temp_bs += 1
+                            else: break
+                        if temp_bs % 2 == 0:
+                            start_quote = j
+                            break
+                
+                if start_quote != -1:
+                    before_str = fixed_str[:start_quote].rstrip()
+                    # A string is a KEY if it's preceded by { or ,
+                    # A string is a VALUE if it's preceded by : or [
+                    if before_str and before_str[-1] in ('{', ','):
+                        # It could be a key OR a value in an array.
+                        # If the stack says we're in an object, it's a key.
+                        if stack and stack[-1] == '}':
+                            # This is a key. Since no colon follows, it's truncated.
+                            fixed_str = before_str
+                            continue
+            
+            break
+
+        # Close all open braces/brackets
+        while stack:
+            fixed_str += stack.pop()
+            
+        return fixed_str
 
     async def call_ai(self, prompt: str) -> Dict[str, Any]:
         """Helper to call DeepSeek AI asynchronously."""
@@ -110,7 +142,12 @@ class AIService:
                 
                 # Try to repair
                 repaired_content = self._repair_json(content)
-                return json.loads(repaired_content)
+                try:
+                    return json.loads(repaired_content)
+                except json.JSONDecodeError as e2:
+                    logger.error(f"Repair failed: {e2}")
+                    logger.error(f"Repaired content: {repaired_content}")
+                    raise
                 
         except Exception as e:
             logger.error(f"Error calling AI: {e}")
@@ -127,30 +164,52 @@ class AIService:
         with open(prompt_path, "r") as f:
             return f.read()
 
-    async def process_script(self, script_text: str, source: str) -> Dict[str, Any]:
+    def load_manifest(self) -> str:
+        """Loads the providers manifest as a string for prompting."""
+        manifest_path = PROMPTS_DIR.parent / "providers_manifest.json"
+        if manifest_path.exists():
+            with open(manifest_path, "r") as f:
+                return f.read()
+        return "[]"
+
+    async def process_script(self, script_text: str, source: str = "dense") -> Dict[str, Any]:
         """Processes a script using AI to extract segments and keywords."""
-        if source == "both":
-            prompt_pin = self.get_prompt("pinterest").replace("{script_text}", script_text)
-            prompt_uns = self.get_prompt("unsplash").replace("{script_text}", script_text)
+        return await self.process_script_dense(script_text)
+
+    async def process_script_dense(self, script_text: str) -> Dict[str, Any]:
+        """Multi-step high-density visual mapping pipeline."""
+        # 1. Vibe Analysis
+        vibe_prompt = self.get_prompt("vibe_analysis").replace("{script_text}", script_text)
+        vibe_analysis = await self.call_ai(vibe_prompt)
+        
+        # 2. Dense Mapping
+        manifest = self.load_manifest()
+        mapping_prompt = self.get_prompt("dense_mapping")\
+            .replace("{script_text}", script_text)\
+            .replace("{providers_manifest}", manifest)\
+            .replace("{vibe_analysis}", json.dumps(vibe_analysis, indent=2))
+        
+        result = await self.call_ai(mapping_prompt)
+        
+        # 3. Post-process to keep it compatible with the current UI if possible
+        # We transform anchors back into keywords with separators
+        segments = result.get("segments", [])
+        for seg in segments:
+            all_keywords = []
+            for anchor in seg.get("anchors", []):
+                # We prefix the keyword with the provider name for the UI to handle
+                # e.g., "nasa: pillars of creation"
+                provider = anchor.get("provider", "pinterest")
+                keywords = [f"{provider}:{k}" for k in anchor.get("keywords", [])]
+                all_keywords.extend(keywords)
+                all_keywords.append("|")
             
-            res_pin, res_uns = await asyncio.gather(self.call_ai(prompt_pin), self.call_ai(prompt_uns))
-            
-            segs_pin = res_pin.get("segments", res_pin)
-            segs_uns = res_uns.get("segments", res_uns)
-            
-            merged_segments = []
-            for i in range(max(len(segs_pin), len(segs_uns))):
-                s_pin = segs_pin[i] if i < len(segs_pin) else {"text": "", "keywords": [], "id": i}
-                s_uns = segs_uns[i] if i < len(segs_uns) else {"text": "", "keywords": [], "id": i}
+            if all_keywords and all_keywords[-1] == "|":
+                all_keywords.pop()
                 
-                merged_segments.append({
-                    "id": s_pin.get("id", i),
-                    "text": s_pin.get("text") or s_uns.get("text"),
-                    "keywords": s_pin.get("keywords", []) + ["|"] + s_uns.get("keywords", [])
-                })
-            return {"segments": merged_segments}
-        else:
-            prompt = self.get_prompt(source).replace("{script_text}", script_text)
-            return await self.call_ai(prompt)
+            seg["keywords"] = all_keywords
+            seg["text"] = seg.get("full_text", "")
+            
+        return {"segments": segments, "vibe": vibe_analysis}
 
 ai_service = AIService()

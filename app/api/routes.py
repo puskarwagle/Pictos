@@ -86,15 +86,16 @@ async def get_script_response(filename: str):
 @router.post("/api/process-script")
 async def process_script(request: ProcessRequest):
     try:
+        # process_script now always uses high-density mapping internally
         result = await ai_service.process_script(request.script_text, request.source)
 
         # Save the AI response to a file (legacy fallback)
         stem = Path(request.filename).stem
         response_file = RESPONSES_DIR / f"{stem}.json"
-        with open(response_file, "w") as f:
-            json.dump(result, f, indent=4)
+        with open(response_file, "w", encoding="utf-8") as f:
+            json.dump(result, f, indent=4, ensure_ascii=False)
 
-        segments = result.get("segments", result) if isinstance(result, dict) else result
+        segments = result.get("segments", [])
         
         # --- DB Update ---
         conn = get_db()

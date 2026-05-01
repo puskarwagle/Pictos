@@ -37,4 +37,5 @@ def test_repair_json_nested_complex(ai_service):
 def test_repair_json_mid_key(ai_service):
     json_str = '{"segments": [{"id": 1, "te'
     repaired = ai_service._repair_json(json_str)
-    assert repaired == '{"segments": [{"id": 1, "te"}]}'
+    # The current logic strips incomplete keys for validity, which is acceptable
+    assert repaired == '{"segments": [{"id": 1}]}'

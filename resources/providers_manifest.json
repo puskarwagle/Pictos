@@ -1,0 +1,38 @@
+[
+  {
+    "name": "pinterest",
+    "best_for": ["diagrams", "labeled charts", "infographics", "specific famous people", "step-by-step guides", "anatomy", "maps", "scientific illustrations"],
+    "vibe": "educational, informative, detailed, instructional",
+    "limitations": "May contain low-res images or memes; requires precise descriptive keywords."
+  },
+  {
+    "name": "unsplash",
+    "best_for": ["cinematic b-roll", "nature photography", "textures", "abstract emotions", "high-quality portraits", "landscapes", "cityscapes", "modern lifestyle"],
+    "vibe": "aesthetic, professional, atmospheric, moody",
+    "limitations": "No diagrams or charts; bad for specific named people or labeled technical content."
+  },
+  {
+    "name": "nasa",
+    "best_for": ["space", "planets", "galaxies", "telescope shots", "astronomy", "astronauts", "rocket launches"],
+    "vibe": "scientific, authentic, epic, realistic",
+    "limitations": "Only space-related content."
+  },
+  {
+    "name": "met",
+    "best_for": ["ancient artifacts", "classical paintings", "statues", "historical clothing", "museum pieces", "medieval armor", "renaissance art"],
+    "vibe": "sophisticated, archival, historical, cultural",
+    "limitations": "Only historical and art-related artifacts; no modern photography."
+  },
+  {
+    "name": "picsum",
+    "best_for": ["random high-quality photography", "generic background images", "placeholder aesthetic"],
+    "vibe": "clean, professional, varied",
+    "limitations": "No search capability; provides random images based on ID or dimensions."
+  },
+  {
+    "name": "dicebear",
+    "best_for": ["avatars", "stylized characters", "personification of abstract users", "consistent character design"],
+    "vibe": "playful, illustrative, modern, flat design",
+    "limitations": "Generative avatars only; no real-world photography."
+  }
+]
