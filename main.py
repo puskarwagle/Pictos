@@ -6,11 +6,16 @@ from app.api.routes import router
 from app.db.session import init_db
 from app.core.config import BASE_DIR, DOWNLOAD_DIR
 
-app = FastAPI(title="NarrateImage")
+from contextlib import asynccontextmanager
 
-@app.on_event("startup")
-async def startup_event():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup logic
     init_db()
+    yield
+    # Shutdown logic (if any)
+
+app = FastAPI(title="NarrateImage", lifespan=lifespan)
 
 # Include API routes
 app.include_router(router)
