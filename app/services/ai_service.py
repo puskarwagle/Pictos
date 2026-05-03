@@ -172,33 +172,87 @@ class AIService:
                 return f.read()
         return "[]"
 
+    def _chunk_script(self, script_text: str, max_chars: int = 1500) -> List[str]:
+        """Splits a long script into manageable chunks for AI processing."""
+        if len(script_text) <= max_chars:
+            return [script_text]
+
+        chunks = []
+        remaining = script_text
+
+        while remaining:
+            if len(remaining) <= max_chars:
+                chunks.append(remaining)
+                break
+
+            # Try to find the best split point within the max_chars limit
+            search_window = remaining[:max_chars]
+            
+            # 1. Try double newline (paragraph)
+            split_idx = search_window.rfind("\n\n")
+            
+            # 2. Try single newline (sentence)
+            if split_idx == -1:
+                split_idx = search_window.rfind("\n")
+            
+            # 3. Try space (word)
+            if split_idx == -1:
+                split_idx = search_window.rfind(" ")
+            
+            # 4. Hard cut (if no separators found, which is unlikely)
+            if split_idx == -1:
+                split_idx = max_chars
+
+            chunks.append(remaining[:split_idx].strip())
+            remaining = remaining[split_idx:].strip()
+
+        return chunks
+
     async def process_script(self, script_text: str, source: str = "dense") -> Dict[str, Any]:
         """Processes a script using AI to extract segments and keywords."""
         return await self.process_script_dense(script_text)
 
     async def process_script_dense(self, script_text: str) -> Dict[str, Any]:
-        """Multi-step high-density visual mapping pipeline."""
-        # 1. Vibe Analysis
+        """Multi-step high-density visual mapping pipeline with parallel chunking."""
+        # 1. Vibe Analysis (Full script for global context)
         vibe_prompt = self.get_prompt("vibe_analysis").replace("{script_text}", script_text)
         vibe_analysis = await self.call_ai(vibe_prompt)
         
-        # 2. Dense Mapping
+        # 2. Chunking
+        chunks = self._chunk_script(script_text, max_chars=1500)
+        logger.info(f"Split script into {len(chunks)} chunks for processing.")
+        
+        # 3. Concurrent Dense Mapping
         manifest = self.load_manifest()
-        mapping_prompt = self.get_prompt("dense_mapping")\
-            .replace("{script_text}", script_text)\
+        mapping_template = self.get_prompt("dense_mapping")\
             .replace("{providers_manifest}", manifest)\
             .replace("{vibe_analysis}", json.dumps(vibe_analysis, indent=2))
         
-        result = await self.call_ai(mapping_prompt)
+        tasks = []
+        for chunk in chunks:
+            prompt = mapping_template.replace("{script_text}", chunk)
+            tasks.append(self.call_ai(prompt))
         
-        # 3. Post-process to keep it compatible with the current UI if possible
-        # We transform anchors back into keywords with separators
-        segments = result.get("segments", [])
-        for seg in segments:
+        # Gather all chunk results
+        chunk_results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # 4. Merge and Renumber
+        all_segments = []
+        for i, result in enumerate(chunk_results):
+            if isinstance(result, Exception):
+                logger.error(f"Chunk {i} failed: {result}")
+                continue
+            
+            segments = result.get("segments", [])
+            all_segments.extend(segments)
+        
+        # Re-assign IDs and post-process
+        for idx, seg in enumerate(all_segments):
+            seg["id"] = idx + 1
+            
+            # Transform anchors into UI-compatible keywords
             all_keywords = []
             for anchor in seg.get("anchors", []):
-                # We prefix the keyword with the provider name for the UI to handle
-                # e.g., "nasa: pillars of creation"
                 provider = anchor.get("provider", "pinterest")
                 keywords = [f"{provider}:{k}" for k in anchor.get("keywords", [])]
                 all_keywords.extend(keywords)
@@ -210,6 +264,6 @@ class AIService:
             seg["keywords"] = all_keywords
             seg["text"] = seg.get("full_text", "")
             
-        return {"segments": segments, "vibe": vibe_analysis}
+        return {"segments": all_segments, "vibe": vibe_analysis}
 
 ai_service = AIService()

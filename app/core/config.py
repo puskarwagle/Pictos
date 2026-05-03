@@ -24,6 +24,10 @@ DB_PATH = BASE_DIR / "narrateimage.db"
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 
+# Image Provider Keys
+PEXELS_API_KEY = os.getenv("PEXELS_API_KEY")
+PIXABAY_API_KEY = os.getenv("PIXABAY_API_KEY")
+
 # Feature Flags
 USE_DB_READ = os.getenv("USE_DB_READ", "False").lower() == "true"
 

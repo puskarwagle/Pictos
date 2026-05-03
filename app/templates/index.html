@@ -73,8 +73,19 @@
 
             <aside class="right-sidebar" id="rightSidebar">
                 <div class="sidebar-header sidebar-card" id="rightSidebarHeader">
-                    <div id="statusMessage">Ready</div>
-                    <button id="deleteSelectedBtn" class="delete-btn">Delete Selected</button>
+                    <div class="header-actions">
+                        <button id="pinSelectedBtn" class="icon-btn" title="Pin Selected">📌</button>
+                        <button id="deleteSelectedBtn" class="delete-btn icon-btn" title="Delete Selected">🗑️</button>
+                    </div>
+                    <div id="statusMessage" style="display: none;">Ready</div>
+                    <div class="header-stats" style="display: none;">
+                        <div id="speedStat" class="stat-item" title="Download Speed">
+                            <span>⚡</span> <span id="speedValue">0</span> KB/s
+                        </div>
+                        <div id="timeStat" class="stat-item" title="Task Time">
+                            <span>⏱️</span> <span id="timeValue">0</span>s
+                        </div>
+                    </div>
                 </div>
                 <div id="rightSidebarImages" class="right-sidebar-images">
                     <p>Select a segment to view images.</p>

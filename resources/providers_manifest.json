@@ -34,5 +34,17 @@
     "best_for": ["avatars", "stylized characters", "personification of abstract users", "consistent character design"],
     "vibe": "playful, illustrative, modern, flat design",
     "limitations": "Generative avatars only; no real-world photography."
+  },
+  {
+    "name": "pexels",
+    "best_for": ["vibrant b-roll", "nature", "modern office", "emotional close-ups", "high-quality cinematic stills", "textures"],
+    "vibe": "bright, professional, high-definition, cinematic",
+    "limitations": "Mainly photography; no diagrams or scientific charts."
+  },
+  {
+    "name": "pixabay",
+    "best_for": ["generic illustrations", "vector graphics", "wide variety of photos", "nature", "animals", "simple educational visuals"],
+    "vibe": "clean, practical, varied, informative",
+    "limitations": "Can be less 'moody' or 'aesthetic' than Pexels or Unsplash; quality varies."
   }
 ]

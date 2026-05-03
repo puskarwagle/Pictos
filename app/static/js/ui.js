@@ -21,6 +21,7 @@ export const elements = {
     segmentsContainer: document.getElementById('segmentsContainer'),
     rightSidebarImages: document.getElementById('rightSidebarImages'),
     deleteSelectedBtn: document.getElementById('deleteSelectedBtn'),
+    pinSelectedBtn: document.getElementById('pinSelectedBtn'),
     editModeToggle: document.getElementById('editModeToggle'),
     darkModeToggle: document.getElementById('darkModeToggle'),
     imageModal: document.getElementById('imageModal'),
@@ -241,56 +242,41 @@ export function showImages(idx) {
             sources[source].forEach(imgPath => {
                 const wrapper = document.createElement('div');
                 wrapper.className = 'image-wrapper';
+                wrapper.setAttribute('data-path', imgPath);
                 
-                const circle = document.createElement('div');
-                circle.className = 'selection-circle';
-                
-                const pin = document.createElement('div');
-                pin.className = 'pin-icon';
-                pin.innerHTML = '📌';
-                pin.title = 'Pin image to this text anchor';
-                
+                // If it was already pinned, mark it
+                const imgObj = segment.images.find(i => (typeof i === 'string' ? i : i.path) === imgPath);
+                if (imgObj && imgObj.pinned) {
+                    wrapper.classList.add('pinned');
+                }
+
                 const img = document.createElement('img');
                 let relativePath = imgPath.split('narrateImage/')[1] || imgPath;
                 if (relativePath.startsWith('/')) relativePath = relativePath.substring(1);
                 img.src = '/' + relativePath;
+                img.loading = 'lazy';
                 
-                wrapper.appendChild(circle);
-                wrapper.appendChild(pin);
-                wrapper.appendChild(img);
-                
-                img.style.cursor = 'zoom-in';
-
-                circle.onclick = (e) => {
+                // Single Click to Toggle Selection
+                wrapper.onclick = (e) => {
                     e.stopPropagation();
-                    if (state.selectedImagePaths.has(imgPath)) {
-                        state.selectedImagePaths.delete(imgPath);
-                        wrapper.classList.remove('selected');
-                    } else {
+                    const isSelected = wrapper.classList.toggle('selected');
+                    if (isSelected) {
                         state.selectedImagePaths.add(imgPath);
-                        wrapper.classList.add('selected');
+                    } else {
+                        state.selectedImagePaths.delete(imgPath);
                     }
                     updateDeleteButtonVisibility();
                 };
 
-                pin.onclick = async (e) => {
+                // Double Click to Zoom (Modal)
+                wrapper.ondblclick = (e) => {
                     e.stopPropagation();
-                    const isPinned = wrapper.classList.toggle('pinned');
-                    try {
-                        await pinImage(imgPath, isPinned);
-                    } catch (err) {
-                        console.error(err);
-                        wrapper.classList.toggle('pinned'); // revert
-                    }
-                };
-
-                img.onclick = (e) => {
-                    e.stopPropagation();
-                    elements.imageModal.style.display = "block";
+                    elements.imageModal.style.display = "flex";
                     elements.modalImg.src = img.src;
                     elements.modalCaption.innerHTML = imgPath.split('/').pop();
                 };
 
+                wrapper.appendChild(img);
                 grid.appendChild(wrapper);
             });
             
@@ -303,13 +289,72 @@ export function showImages(idx) {
 }
 
 /**
- * Updates the visibility and text of the "Delete Selected" button based on current selection.
+ * Updates the visibility and tooltips of action buttons based on current selection.
  */
 export function updateDeleteButtonVisibility() {
-    if (state.selectedImagePaths.size > 0) {
-        elements.deleteSelectedBtn.style.display = 'block';
-        elements.deleteSelectedBtn.textContent = `Delete Selected (${state.selectedImagePaths.size})`;
+    const hasSelection = state.selectedImagePaths.size > 0;
+    // Buttons are always visible now as per user request
+    elements.deleteSelectedBtn.style.opacity = hasSelection ? '1' : '0.4';
+    elements.deleteSelectedBtn.style.pointerEvents = hasSelection ? 'auto' : 'none';
+    elements.pinSelectedBtn.style.opacity = hasSelection ? '1' : '0.4';
+    elements.pinSelectedBtn.style.pointerEvents = hasSelection ? 'auto' : 'none';
+    
+    if (hasSelection) {
+        elements.deleteSelectedBtn.title = `Delete Selected (${state.selectedImagePaths.size})`;
+        elements.pinSelectedBtn.title = `Pin Selected (${state.selectedImagePaths.size})`;
     } else {
-        elements.deleteSelectedBtn.style.display = 'none';
+        elements.deleteSelectedBtn.title = 'Delete Selected';
+        elements.pinSelectedBtn.title = 'Pin Selected';
     }
 }
+
+/**
+ * Toggles selection of all visible images in the sidebar.
+ */
+export function toggleSelectAll() {
+    const images = elements.rightSidebarImages.querySelectorAll('.image-wrapper');
+    if (images.length === 0) return;
+
+    const allSelected = Array.from(images).every(img => img.classList.contains('selected'));
+    
+    images.forEach(wrapper => {
+        const imgPath = wrapper.getAttribute('data-path');
+        if (allSelected) {
+            wrapper.classList.remove('selected');
+            state.selectedImagePaths.delete(imgPath);
+        } else {
+            wrapper.classList.add('selected');
+            state.selectedImagePaths.add(imgPath);
+        }
+    });
+    
+    updateDeleteButtonVisibility();
+}
+
+/**
+ * Pins all selected images.
+ */
+export async function pinSelectedImages() {
+    if (state.selectedImagePaths.size === 0) return;
+    
+    const pathsToPin = Array.from(state.selectedImagePaths);
+    try {
+        setStatus(`Pinning ${pathsToPin.length} images...`, true);
+        for (const path of pathsToPin) {
+            await pinImage(path, true);
+        }
+        
+        // Refresh UI to show pinned status
+        if (state.activeSegmentIndex !== -1) {
+            showImages(state.activeSegmentIndex);
+        }
+        
+        state.selectedImagePaths.clear();
+        updateDeleteButtonVisibility();
+        setStatus('Images pinned successfully.');
+    } catch (err) {
+        console.error('Failed to pin images:', err);
+        setStatus('Error pinning images', false, true);
+    }
+}
+

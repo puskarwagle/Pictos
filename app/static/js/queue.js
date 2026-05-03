@@ -27,9 +27,17 @@ async function processQueue() {
         tagElement.classList.remove('downloaded');
         
         const statusMsg = document.getElementById('statusMessage');
+        const headerStats = document.querySelector('.header-stats');
+        
         if (statusMsg) {
-            statusMsg.textContent = `Scraping & downloading: ${keyword}...`;
+            statusMsg.textContent = `Downloading ${keyword}...`;
+            statusMsg.style.display = 'block';
         }
+        
+        if (headerStats) {
+            headerStats.style.display = 'flex';
+        }
+        
         const startTime = performance.now();
         
         const isApiProvider = state.API_PROVIDERS.has(source);
@@ -44,8 +52,22 @@ async function processQueue() {
             const timeSec = (endTime - startTime) / 1000;
             const kb = (data.downloaded_bytes || 0) / 1024;
             const speed = timeSec > 0 ? (kb / timeSec).toFixed(1) : 0;
-            const numImages = data.images ? data.images.length : 0;
-            statusMsg.textContent = `Finished "${keyword}" (${numImages} imgs), Speed: ${speed} KB/s`;
+            
+            // Update stats
+            const speedValue = document.getElementById('speedValue');
+            const timeValue = document.getElementById('timeValue');
+            if (speedValue) speedValue.textContent = speed;
+            if (timeValue) timeValue.textContent = timeSec.toFixed(1);
+            
+            statusMsg.style.display = 'none';
+            
+            // Hide stats after a delay
+            if (headerStats) {
+                if (window.statsTimeout) clearTimeout(window.statsTimeout);
+                window.statsTimeout = setTimeout(() => {
+                    headerStats.style.display = 'none';
+                }, 10000); // 10 seconds
+            }
         }
         
         // Add new images to segment and remove duplicates by path

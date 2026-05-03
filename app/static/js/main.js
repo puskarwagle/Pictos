@@ -117,10 +117,17 @@ function setupEventListeners() {
                 ui.showImages(state.activeSegmentIndex);
                 ui.renderSegments(queueDownload);
             }
+            state.selectedImagePaths.clear();
+            ui.updateDeleteButtonVisibility();
             ui.setStatus(`Deleted ${data.deleted.length} images.`, false, true);
         } catch (err) {
             ui.setStatus('Error deleting images: ' + err.message);
         }
+    };
+
+    // Pin Selected Button
+    elements.pinSelectedBtn.onclick = async () => {
+        await ui.pinSelectedImages();
     };
 
     // Modal Close Logic
@@ -131,6 +138,9 @@ function setupEventListeners() {
         if (event.target == elements.imageModal) {
             elements.imageModal.style.display = "none";
         }
+    };
+    elements.imageModal.ondblclick = () => {
+        elements.imageModal.style.display = "none";
     };
 
     // Resizable Sidebar Logic

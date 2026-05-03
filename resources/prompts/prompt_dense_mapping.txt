@@ -40,8 +40,8 @@ Return ONLY a valid JSON object:
   ]
 }
 
-### VIBE ANALYSIS:
+### VIBE ANALYSIS (Global context for the whole video):
 {vibe_analysis}
 
-### SCRIPT:
+### SCRIPT CHUNK (Process ONLY this part of the text):
 {script_text}
