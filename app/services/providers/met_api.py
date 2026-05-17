@@ -41,7 +41,7 @@ async def search(query: str, count: int = 5) -> list[dict]:
     2. Fetch details for each ID (parallel, capped at MAX_PARALLEL_FETCHES)
     Skips objects with no primaryImage, fetches extras until count is met.
     """
-    async with httpx.AsyncClient(timeout=10.0) as client:
+    async with httpx.AsyncClient(timeout=10.0, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}) as client:
         # Step 1: Search for object IDs
         resp = await client.get(
             f"{BASE_URL}/search",
@@ -58,7 +58,7 @@ async def search(query: str, count: int = 5) -> list[dict]:
     results = []
     offset = 0
 
-    async with httpx.AsyncClient(timeout=10.0) as client:
+    async with httpx.AsyncClient(timeout=10.0, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}) as client:
         while len(results) < count and offset < len(object_ids):
             batch_ids = object_ids[offset:offset + MAX_PARALLEL_FETCHES]
             offset += MAX_PARALLEL_FETCHES

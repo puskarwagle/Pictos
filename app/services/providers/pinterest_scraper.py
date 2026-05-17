@@ -10,6 +10,7 @@ import argparse
 import time
 import random
 import urllib.request
+import urllib.parse
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 
@@ -108,7 +109,8 @@ async def get_pinterest_images_async(tag, num_images=5, headless=True):
     """
     Search for a tag on Pinterest and return image URLs (Async).
     """
-    url = f"https://www.pinterest.com/search/pins/?q={tag}"
+    encoded_tag = urllib.parse.quote(tag)
+    url = f"https://www.pinterest.com/search/pins/?q={encoded_tag}"
     print(f"Searching Pinterest for: {tag}")
     return await get_image_urls(url, num_images=num_images, headless=headless)
 
@@ -116,10 +118,13 @@ def main():
     args = parse_args()
     # Support both username/tag and direct search
     if args.username and args.tag:
-        pinterest_url = f"https://www.pinterest.com/{args.username}/{args.tag}/"
+        encoded_username = urllib.parse.quote(args.username)
+        encoded_tag = urllib.parse.quote(args.tag)
+        pinterest_url = f"https://www.pinterest.com/{encoded_username}/{encoded_tag}/"
         name_img = args.username
     else:
-        pinterest_url = f"https://www.pinterest.com/search/pins/?q={args.tag}"
+        encoded_tag = urllib.parse.quote(args.tag)
+        pinterest_url = f"https://www.pinterest.com/search/pins/?q={encoded_tag}"
         name_img = args.tag
         
     print(f"Starting with URL: {pinterest_url}")

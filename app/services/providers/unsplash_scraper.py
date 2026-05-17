@@ -10,11 +10,14 @@ import random
 from pathlib import Path
 from camoufox.async_api import AsyncCamoufox as Camoufox
 
+import urllib.parse
+
 async def get_unsplash_images_async(tag, num_images=5, headless=True):
     """
     Search for a tag on Unsplash and return image URLs (Async).
     """
-    url = f"https://unsplash.com/s/photos/{tag}"
+    encoded_tag = urllib.parse.quote(tag)
+    url = f"https://unsplash.com/s/photos/{encoded_tag}"
     print(f"Searching Unsplash for: {tag}")
     
     async with Camoufox(headless=headless) as browser:
