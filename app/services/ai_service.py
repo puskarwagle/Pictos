@@ -158,8 +158,8 @@ class AIService:
         filename = f"prompt_{source}.txt"
         prompt_path = PROMPTS_DIR / filename
         if not prompt_path.exists():
-            # Fallback to general photography if specific prompt doesn't exist
-            prompt_path = PROMPTS_DIR / "prompt_photography.txt"
+            # Fallback to general dense mapping if specific prompt doesn't exist
+            prompt_path = PROMPTS_DIR / "prompt_dense_mapping.txt"
         
         with open(prompt_path, "r") as f:
             return f.read()
