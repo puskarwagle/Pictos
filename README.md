@@ -1,6 +1,6 @@
-# NarrateImage
+# NarrateImage (AI YouTube Clip Finder)
 
-NarrateImage is a specialized tool for video creators (AI creators, documentary filmmakers, etc.) to streamline the process of finding and managing visual assets. It uses AI to analyze your scripts, breaks them into logical segments, and manages a persistent, deduplicated library of visual assets linked directly to your text content.
+NarrateImage is a specialized tool for video creators (AI creators, documentary filmmakers, YouTubers, etc.) to streamline the process of finding and managing visual assets. Instead of static images, it uses AI to analyze your narration scripts, breaks them into logical segments, and searches YouTube using `yt-dlp` and `youtube-transcript-api` to find and segment exact video clips matching your visual keywords based on spoken transcripts.
 
 ---
 
@@ -13,8 +13,8 @@ NarrateImage is built with a **Python (FastAPI)** backend and a **Vanilla JavaSc
 [ Frontend (Vanilla JS) ] <--> [ API (FastAPI) ] <--> [ SQLite DB ]
           |                        |                      |
           |                        +--> [ AI Service (DeepSeek) ]
-          |                        +--> [ Provider Services (Scrapers/APIs) ]
-          +--> [ Local Storage (Images/Scripts) ]
+          |                        +--> [ YouTube & Transcript Services (yt-dlp) ]
+          +--> [ Local Storage (Clips/Scripts) ]
 ```
 
 ### Core Data Flow
@@ -22,9 +22,9 @@ NarrateImage is built with a **Python (FastAPI)** backend and a **Vanilla JavaSc
 2.  **Analysis:** The AI (`ai_service.py`) chunks the script, performs vibe analysis, and generates a **Dense Visual Mapping** (anchors + keywords).
 3.  **Persistence:** 
     -   Script text is stored and hashed into **Text Anchors**.
-    -   Images are downloaded and linked to these anchors in the `images` table.
-4.  **Retrieval:** The frontend (`ui.js`) renders segments. Clicking a keyword triggers the **Download Queue** (`queue.js`), which fetches assets via the backend.
-5.  **Deduplication:** The backend (`image_service.py`) ensures no duplicate images exist on disk by checking both source URLs and binary SHA-256 hashes.
+    -   YouTube clips are matched and linked to these anchors in the `clips` SQLite table.
+4.  **Retrieval:** The frontend (`ui.js`) renders segments. Clicking a keyword triggers the **Download Queue** (`queue.js`), which searches YouTube and matches transcripts via the backend.
+5.  **Alignment:** The backend searches YouTube, aligns keyword occurrences with video transcripts, downloads thumbnails, and returns the exact video segment start/end timestamps.
 
 ---
 
@@ -32,21 +32,17 @@ NarrateImage is built with a **Python (FastAPI)** backend and a **Vanilla JavaSc
 
 ### 🧠 Intelligent Script Processing
 -   **DeepSeek Integration:** Uses the OpenAI SDK to communicate with DeepSeek-V3 for high-density keyword extraction.
--   **Fuzzy Matching (92%):** When you edit your script, the system uses `difflib` to automatically re-anchor existing images to the updated text segments, preventing data loss during refinement.
+-   **Fuzzy Matching (92%):** When you edit your script in the editor, the system uses `difflib` to automatically re-anchor existing clips to the updated text segments, preventing data loss during script refinement.
 
-### 🖼 Advanced Asset Management
--   **Two-Step Deduplication:**
-    -   **Pre-download:** Checks if the source URL already exists in the database.
-    -   **Post-download:** Performs a binary SHA-256 hash on the file. If it matches an existing file, the new one is deleted and the DB record points to the original.
--   **Stable Pinning:** Pin 📌 images to specific text anchors. Pins survive script re-segmentation and are protected from the garbage collector.
+### 🎥 Precise YouTube Clip Finder
+-   **Transcript Alignment:** Searches YouTube and fetches transcripts automatically. Aligns the search phrase with English or auto-generated subtitles to center a 10-second clip on the exact moment the phrase is spoken.
+-   **Local Thumbnail Caching:** Automatically downloads and caches YouTube thumbnails locally to ensure highly responsive, offline-capable grid rendering.
+-   **Stable Pinning:** Pin 📌 clips to specific text anchors. Pins survive script re-segmentation and are protected from the garbage collector.
 
-### ⚡️ Interactive Frontend
--   **Concurrency-Limited Queue:** Manages background image downloads (max 4 parallel) with real-time speed (KB/s) and duration metrics.
--   **Dual-View Orchestration:** Seamlessly switch between **Edit Mode** (raw text) and **Segments Mode** (interactive keywords and images).
--   **Persistent UI State:** Remembers your Dark/Light mode preference and draggable sidebar width via `localStorage`.
-
-### 🧹 Automated Maintenance
--   **Reference-Counted GC:** The `garbage_collect.py` script safely purges unused files only when zero active or pinned DB records reference them, following a configurable TTL.
+### ⚡️ Interactive Premium Frontend
+-   **In-App Video Playback Modal:** Double-clicking any clip card launches a fluid, interactive video player modal containing a YouTube embed configured to start precisely at the matched transcript timestamp with autoplay enabled.
+-   **Draggable Resizer Sidebar:** Seamlessly drag to expand the visual assets panel. Width preference is cached along with Dark/Light mode in the user's browser `localStorage`.
+-   **Concurrency-Limited Queue:** Manages background YouTube queries and metadata retrieval with real-time speed and duration timing indicators.
 
 ---
 
@@ -56,23 +52,23 @@ NarrateImage is built with a **Python (FastAPI)** backend and a **Vanilla JavaSc
 -   `api/routes.py`: The central hub for all HTTP endpoints.
 -   `core/config.py`: System-wide settings and directory initialization.
 -   `db/`:
-    -   `session.py`: SQLite connection management (WAL mode enabled).
+    -   `session.py`: SQLite connection management (WAL mode enabled) and table schemas.
     -   `repository.py`: Low-level SQL queries and data access layer.
 -   `services/`:
     -   `ai_service.py`: Script chunking, vibe analysis, and DeepSeek orchestration.
-    -   `image_service.py`: The logic for downloading, hashing, and deduping images.
-    -   `providers/`: Specialized scrapers (Pinterest/Unsplash) and API wrappers (NASA, Met, etc.).
+    -   `clip_service.py`: Logic for storing, retrieving, and downloading local clip thumbnails.
+    -   `youtube_service.py`: Orchestrates yt-dlp search and youtube-transcript-api transcript alignment.
 -   `static/`: The frontend layer (JS modules, CSS segments, assets).
 -   `templates/`: HTML entry point.
 
 ### `data/` (The Persistence Layer - Git Ignored)
--   `video_scripts/`: Source `.md` files.
+-   `video_scripts/`: Source `.md` scripts.
 -   `ai_responses/`: Cached JSON results from the AI pipeline.
--   `downloaded_images/`: Physical image storage, organized by script ID.
+-   `downloaded_clips/`: Local thumbnail images organized by script ID.
 
 ### `resources/`
 -   `prompts/`: Version-controlled AI instructions for different visual styles (archival, photography, etc.).
--   `providers_manifest.json`: Configuration for available image sources.
+-   `providers_manifest.json`: Configuration for the active YouTube provider source.
 
 ---
 
@@ -83,6 +79,7 @@ NarrateImage is built with a **Python (FastAPI)** backend and a **Vanilla JavaSc
 -   A DeepSeek API Key
 
 ### 2. Installation
+Ensure all system dependencies are installed and then install the Python packages:
 ```bash
 pip install -r requirements.txt
 ```
@@ -93,6 +90,7 @@ Create a `.env` file in the root:
 DEEPSEEK_API_KEY=your_key_here
 DEEPSEEK_BASE_URL=https://api.deepseek.com
 USE_DB_READ=true
+CLIP_DURATION=10
 ```
 
 ### 4. Running the App
@@ -101,23 +99,6 @@ USE_DB_READ=true
 python main.py
 ```
 Visit `http://localhost:8000` to begin.
-
-### 5. Maintenance Commands
-```bash
-# Clean up orphaned/deleted assets (Dry run by default)
-PYTHONPATH=. python scripts/garbage_collect.py
-
-# Commit cleanup (Force delete)
-PYTHONPATH=. python scripts/garbage_collect.py --no-dry-run
-```
-
----
-
-## 🧪 Testing
-The project uses `pytest` for backend verification.
-```bash
-PYTHONPATH=. pytest
-```
 
 ---
 
