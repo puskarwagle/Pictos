@@ -9,23 +9,19 @@ from app.core.config import SCRIPTS_DIR, RESPONSES_DIR, BASE_DIR
 from app.db.session import get_db
 from app.db.repository import (
     get_script_id_by_filename, create_script, delete_segments_for_script,
-    create_segment, orphan_unused_images, soft_delete_image,
-    get_anchor_and_script_id, update_image_pinned_status,
+    create_segment, orphan_unused_images, soft_delete_clip,
+    get_anchor_and_script_id, update_clip_pinned_status,
     hash_content, get_anchor_by_hash, get_anchors_for_script, 
-    update_anchor_content, create_anchor
+    update_anchor_content, create_anchor, orphan_unused_clips
 )
 import difflib
 from app.models.api_models import (
-    ProcessRequest, DownloadRequest, KeywordDownloadRequest,
-    DeleteImagesRequest, ApiFetchRequest, PinImageRequest, TranslateRequest, SaveSegmentsRequest
+    ProcessRequest, ClipFetchRequest,
+    DeleteClipsRequest, PinClipRequest, TranslateRequest, SaveSegmentsRequest
 )
 from app.services.ai_service import ai_service
-from app.services.image_service import (
-    attach_images_to_segments, BROWSER_SEMAPHORE, process_and_store_image
-)
-from app.services.providers import PROVIDERS, API_PROVIDERS
-from app.services.providers.pinterest_scraper import get_pinterest_images_async
-from app.services.providers.unsplash_scraper import get_unsplash_images_async
+from app.services.clip_service import attach_clips_to_segments, process_and_store_clip
+from app.services.youtube_service import search_and_match
 
 def find_or_create_anchor(conn, script_id: str, content: str):
     """
@@ -33,7 +29,7 @@ def find_or_create_anchor(conn, script_id: str, content: str):
     Implements a two-stage matching process:
     1. Exact Match: Checks if the content hash already exists for this script.
     2. Fuzzy Match: Uses difflib to find existing anchors with >92% similarity,
-       allowing for minor edits in the text editor without losing image associations.
+       allowing for minor edits in the text editor without losing clip associations.
     """
     cursor = conn.cursor()
     content_hash = hash_content(content)
@@ -81,7 +77,7 @@ async def get_script_response(filename: str):
     with open(response_file, "r") as f:
         data = json.load(f)
         segments = data.get("segments", data) if isinstance(data, dict) else data
-        return attach_images_to_segments(segments, filename)
+        return attach_clips_to_segments(segments, filename)
 
 @router.post("/api/process-script")
 async def process_script(request: ProcessRequest):
@@ -114,74 +110,32 @@ async def process_script(request: ProcessRequest):
             create_segment(cursor, script_id, anchor_id, segment.get("id"), segment.get("keywords", []))
 
         orphan_unused_images(cursor, script_id, list(new_anchor_ids))
+        orphan_unused_clips(cursor, script_id, list(new_anchor_ids))
         
         conn.commit()
         conn.close()
 
-        return attach_images_to_segments(segments, request.filename)
+        return attach_clips_to_segments(segments, request.filename)
     except Exception as e:
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/api/delete-images")
-async def delete_images(request: DeleteImagesRequest):
+@router.post("/api/delete-clips")
+async def delete_clips(request: DeleteClipsRequest):
     conn = get_db()
     cursor = conn.cursor()
-    deleted_paths = []
-    for path_str in request.image_paths:
-        if soft_delete_image(cursor, path_str) > 0:
-            deleted_paths.append(path_str)
+    deleted_ids = []
+    for clip_id in request.clip_ids:
+        if soft_delete_clip(cursor, clip_id) > 0:
+            deleted_ids.append(clip_id)
     conn.commit()
     conn.close()
-    return {"deleted": deleted_paths}
+    return {"deleted": deleted_ids}
 
-@router.post("/api/download-keyword-images")
-async def download_keyword_images(request: KeywordDownloadRequest):
-    conn = get_db()
-    cursor = conn.cursor()
-    row = get_anchor_and_script_id(cursor, request.filename, request.segment_id)
-    if not row:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Segment mapping not found in DB")
-
-    anchor_id, script_id = row["anchor_id"], row["script_id"]
-    conn.close()
-
-    try:
-        source_urls = []
-        async with BROWSER_SEMAPHORE:
-            if request.source == "pinterest":
-                urls = await get_pinterest_images_async(request.keyword, 3, True)
-                source_urls = [(u, "pinterest") for u in urls]
-            elif request.source == "unsplash":
-                urls = await get_unsplash_images_async(request.keyword, 3, True)
-                source_urls = [(u, "unsplash") for u in urls]
-            elif request.source == "both":
-                urls_pin = await get_pinterest_images_async(request.keyword, 2, True)
-                urls_uns = await get_unsplash_images_async(request.keyword, 2, True)
-                source_urls = [(u, "pinterest") for u in urls_pin] + [(u, "unsplash") for u in urls_uns]
-        
-        new_images = []
-        total_downloaded_bytes = 0
-        if source_urls:
-            for url, img_source in source_urls:
-                res = await process_and_store_image(url, anchor_id, script_id, request.keyword, img_source)
-                if res:
-                    new_images.append({"path": res["path"], "source": res["source"], "keyword": res["keyword"]})
-                    total_downloaded_bytes += res.get("size", 0)
-            
-            return {"images": new_images, "downloaded_bytes": total_downloaded_bytes}
-            
-        return {"images": [], "downloaded_bytes": 0}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.post("/api/fetch")
-async def fetch_api_images(request: ApiFetchRequest):
-    if request.provider not in PROVIDERS:
-        raise HTTPException(status_code=400, detail=f"Unknown provider: {request.provider}")
-
+@router.post("/api/fetch-clips")
+async def fetch_clips(request: ClipFetchRequest):
+    """Fetch YouTube clips for a keyword in a specific segment."""
     conn = get_db()
     cursor = conn.cursor()
     row = get_anchor_and_script_id(cursor, request.filename, request.segment_id)
@@ -193,29 +147,26 @@ async def fetch_api_images(request: ApiFetchRequest):
     conn.close()
 
     try:
-        search_fn = PROVIDERS[request.provider]
-        search_results = await search_fn(request.keyword, count=3)
+        # Search YouTube and match transcripts
+        clip_results = await search_and_match(request.keyword, count=3)
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Provider {request.provider} error: {e}")
+        raise HTTPException(status_code=502, detail=f"YouTube search error: {e}")
 
-    new_images = []
-    total_downloaded_bytes = 0
-    for result in search_results:
-        res = await process_and_store_image(
-            result["url"], anchor_id, script_id, request.keyword, 
-            result["source"], request.provider, "api"
+    new_clips = []
+    for clip_data in clip_results:
+        res = await process_and_store_clip(
+            clip_data, anchor_id, script_id, request.keyword
         )
         if res:
-            new_images.append({"path": res["path"], "source": res["source"], "keyword": res["keyword"]})
-            total_downloaded_bytes += res.get("size", 0)
+            new_clips.append(res)
 
-    return {"images": new_images, "downloaded_bytes": total_downloaded_bytes}
+    return {"clips": new_clips}
 
-@router.post("/api/pin-image")
-async def pin_image(request: PinImageRequest):
+@router.post("/api/pin-clip")
+async def pin_clip(request: PinClipRequest):
     conn = get_db()
     cursor = conn.cursor()
-    update_image_pinned_status(cursor, request.image_path, request.pin, request.note)
+    update_clip_pinned_status(cursor, request.clip_id, request.pin, request.note)
     conn.commit()
     conn.close()
     return {"status": 'pinned' if request.pin else 'active'}
@@ -248,6 +199,7 @@ async def save_segments(request: SaveSegmentsRequest):
             create_segment(cursor, script_id, anchor_id, seg_dict.get("id"), seg_dict.get("keywords", []))
             
         orphan_unused_images(cursor, script_id, list(new_anchor_ids))
+        orphan_unused_clips(cursor, script_id, list(new_anchor_ids))
         conn.commit()
         conn.close()
         

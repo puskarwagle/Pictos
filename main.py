@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from app.api.routes import router
 from app.db.session import init_db
-from app.core.config import BASE_DIR, DOWNLOAD_DIR
+from app.core.config import BASE_DIR, DOWNLOAD_DIR, CLIPS_DIR
 
 from contextlib import asynccontextmanager
 
@@ -24,6 +24,7 @@ app.include_router(router)
 # The paths are relative to BASE_DIR which is the project root
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "app/static")), name="static")
 app.mount("/data/downloaded_images", StaticFiles(directory=str(DOWNLOAD_DIR)), name="images")
+app.mount("/data/downloaded_clips", StaticFiles(directory=str(CLIPS_DIR)), name="clips")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

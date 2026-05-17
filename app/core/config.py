@@ -11,6 +11,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 DATA_DIR = BASE_DIR / "data"
 RESPONSES_DIR = DATA_DIR / "ai_responses"
 DOWNLOAD_DIR = DATA_DIR / "downloaded_images"
+CLIPS_DIR = DATA_DIR / "downloaded_clips"
 SCRIPTS_DIR = DATA_DIR / "video_scripts"
 
 # Resource directories
@@ -24,13 +25,12 @@ DB_PATH = BASE_DIR / "narrateimage.db"
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 
-# Image Provider Keys
-PEXELS_API_KEY = os.getenv("PEXELS_API_KEY")
-PIXABAY_API_KEY = os.getenv("PIXABAY_API_KEY")
+# Clip settings
+CLIP_DURATION = int(os.getenv("CLIP_DURATION", "10"))  # seconds
 
 # Feature Flags
 USE_DB_READ = os.getenv("USE_DB_READ", "False").lower() == "true"
 
 # Ensure directories exist
-for directory in [RESPONSES_DIR, DOWNLOAD_DIR, SCRIPTS_DIR, PROMPTS_DIR]:
+for directory in [RESPONSES_DIR, DOWNLOAD_DIR, CLIPS_DIR, SCRIPTS_DIR, PROMPTS_DIR]:
     directory.mkdir(parents=True, exist_ok=True)

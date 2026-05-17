@@ -254,3 +254,103 @@ def update_image_pinned_status(cursor: sqlite3.Cursor, file_path: str, is_pinned
         SET status = ?, pin_note = ?, user_touched = 1
         WHERE file_path = ? OR legacy_path = ?
     """, (status, note, file_path, file_path))
+
+
+# --- Clip Repository Functions ---
+
+def insert_clip(
+    cursor: sqlite3.Cursor,
+    anchor_id: str,
+    video_id: str,
+    video_title: str,
+    video_url: str,
+    thumbnail_path: Optional[str],
+    thumbnail_url: Optional[str],
+    timestamp_start: float,
+    timestamp_end: float,
+    transcript_snippet: str,
+    keyword: str,
+    source: str = 'youtube',
+) -> str:
+    """Inserts a new clip record into the database and returns its ID."""
+    clip_id = generate_id()
+    cursor.execute("""
+        INSERT INTO clips (id, anchor_id, video_id, video_title, video_url,
+                          thumbnail_path, thumbnail_url, timestamp_start, timestamp_end,
+                          transcript_snippet, keyword, source)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (clip_id, anchor_id, video_id, video_title, video_url,
+          thumbnail_path, thumbnail_url, timestamp_start, timestamp_end,
+          transcript_snippet, keyword, source))
+    return clip_id
+
+
+def get_clips_by_anchor(cursor: sqlite3.Cursor, anchor_id: str) -> List[sqlite3.Row]:
+    """Retrieves all active or pinned clips for a specific anchor."""
+    cursor.execute("""
+        SELECT id, video_id, video_title, video_url, thumbnail_path, thumbnail_url,
+               timestamp_start, timestamp_end, transcript_snippet, keyword, source
+        FROM clips
+        WHERE anchor_id = ? AND status IN ('active', 'pinned')
+    """, (anchor_id,))
+    return cursor.fetchall()
+
+
+def get_existing_clip(
+    cursor: sqlite3.Cursor,
+    video_id: str,
+    timestamp_start: float,
+    anchor_id: str
+) -> Optional[sqlite3.Row]:
+    """Checks if a clip with the same video_id and approximate timestamp already exists for this anchor."""
+    cursor.execute("""
+        SELECT id, thumbnail_path FROM clips
+        WHERE video_id = ? AND anchor_id = ?
+        AND ABS(timestamp_start - ?) < 5
+        AND status != 'deleted'
+        LIMIT 1
+    """, (video_id, anchor_id, timestamp_start))
+    return cursor.fetchone()
+
+
+def update_clips_last_used(cursor: sqlite3.Cursor, anchor_id: str):
+    """Updates the last_used timestamp for all clips associated with an anchor."""
+    cursor.execute("UPDATE clips SET last_used = CURRENT_TIMESTAMP WHERE anchor_id = ?", (anchor_id,))
+
+
+def soft_delete_clip(cursor: sqlite3.Cursor, clip_id: str) -> int:
+    """Soft deletes a clip in the database by its ID."""
+    cursor.execute("UPDATE clips SET status = 'deleted', user_touched = 1 WHERE id = ?", (clip_id,))
+    return cursor.rowcount
+
+
+def update_clip_pinned_status(cursor: sqlite3.Cursor, clip_id: str, is_pinned: bool, note: Optional[str] = None):
+    """Updates the pinned status and note for a clip."""
+    status = 'pinned' if is_pinned else 'active'
+    cursor.execute("""
+        UPDATE clips
+        SET status = ?, pin_note = ?, user_touched = 1
+        WHERE id = ?
+    """, (status, note, clip_id))
+
+
+def orphan_unused_clips(cursor: sqlite3.Cursor, script_id: str, current_anchor_ids: List[str]):
+    """Marks clips as orphaned if their anchors are no longer present in the script."""
+    if not current_anchor_ids:
+        return
+
+    cursor.execute("""
+        SELECT DISTINCT anchor_id FROM segments
+        WHERE script_id = ? AND anchor_id NOT IN ({})
+    """.format(','.join(['?']*len(current_anchor_ids))), (script_id, *current_anchor_ids))
+
+    old_anchor_ids = [row[0] for row in cursor.fetchall()]
+    if old_anchor_ids:
+        cursor.execute("""
+            UPDATE clips
+            SET status = 'orphaned'
+            WHERE anchor_id IN ({})
+            AND status = 'active'
+            AND user_touched = 0
+        """.format(','.join(['?']*len(old_anchor_ids))), (*old_anchor_ids,))
+

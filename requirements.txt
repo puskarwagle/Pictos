@@ -1,10 +1,11 @@
 fastapi
 uvicorn
 openai
-camoufox
 python-dotenv
 pytest
 httpx
 pydantic
 jinja2
 python-multipart
+youtube-transcript-api
+yt-dlp

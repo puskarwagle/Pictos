@@ -22,9 +22,9 @@ export const state = {
      * Each object typically contains:
      * - id: {number} The segment ID (AI-generated or paragraph index).
      * - text: {string} The narration text for this segment.
-     * - keywords: {string[]} Array of search keywords (with optional 'provider:' prefix).
-     * - images: {Array<Object|string>} List of associated image metadata or paths.
-     * - downloaded_keywords: {string[]} Keywords that already have local images.
+     * - keywords: {string[]} Array of search keywords.
+     * - clips: {Array<Object>} List of associated YouTube clip metadata.
+     * - downloaded_keywords: {string[]} Keywords that already have clips.
      * @type {Array<Object>} 
      */
     processedSegments: [],
@@ -46,22 +46,15 @@ export const state = {
 
     /** 
      * The 0-based index of the currently active/selected segment in the main view.
-     * Used to determine which images to show in the right sidebar.
+     * Used to determine which clips to show in the right sidebar.
      * @type {number} 
      */
     activeSegmentIndex: -1,
 
     /** 
-     * A set of unique file paths for images currently selected by the user.
-     * Selected images can be pinned or deleted in bulk.
+     * A set of unique clip IDs for clips currently selected by the user.
+     * Selected clips can be pinned or deleted in bulk.
      * @type {Set<string>} 
      */
-    selectedImagePaths: new Set(),
-
-    /** 
-     * A set of supported API-based image providers. 
-     * Used by the download queue to distinguish between scraper-based and API-based requests.
-     * @type {Set<string>} 
-     */
-    API_PROVIDERS: new Set(["picsum", "dicebear", "robohash", "uiavatars", "nasa", "met"])
+    selectedClipIds: new Set(),
 };

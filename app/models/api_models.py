@@ -6,11 +6,12 @@ class ScriptSegment(BaseModel):
     text: str
     keywords: List[str]
     images: Optional[List[Any]] = []
+    clips: Optional[List[Any]] = []
 
 class ProcessRequest(BaseModel):
     filename: str
     script_text: str
-    source: Optional[str] = "pinterest"
+    source: Optional[str] = "dense"
 
 class DownloadRequest(BaseModel):
     filename: str
@@ -20,23 +21,16 @@ class SaveSegmentsRequest(BaseModel):
     filename: str
     segments: List[ScriptSegment]
 
-class KeywordDownloadRequest(BaseModel):
+class ClipFetchRequest(BaseModel):
     filename: str
     segment_id: int
     keyword: str
-    source: Optional[str] = "pinterest"
 
-class DeleteImagesRequest(BaseModel):
-    image_paths: List[str]
+class DeleteClipsRequest(BaseModel):
+    clip_ids: List[str]
 
-class ApiFetchRequest(BaseModel):
-    filename: str
-    segment_id: int
-    keyword: str
-    provider: str
-
-class PinImageRequest(BaseModel):
-    image_path: str
+class PinClipRequest(BaseModel):
+    clip_id: str
     pin: bool
     note: Optional[str] = None
 

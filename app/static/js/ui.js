@@ -1,13 +1,12 @@
 /**
  * @file ui.js
- * @description Handles all DOM manipulations, rendering, and UI-specific logic for the NarrateImage application.
- * This module is responsible for keeping the view in sync with the global state,
- * managing interactive components like the resizer and image modal, and 
- * rendering complex data structures like script segments and image grids.
+ * @description Handles all DOM manipulations, rendering, and UI-specific logic.
+ * Manages the view in sync with the global state, interactive components,
+ * and rendering clip cards instead of image grids.
  */
 
 import { state } from './state.js';
-import { pinImage, saveSegments } from './api.js';
+import { pinClip, saveSegments } from './api.js';
 
 export async function syncStateWithBackend() {
     if (!state.selectedScript) return;
@@ -18,11 +17,8 @@ export async function syncStateWithBackend() {
     }
 }
 
-
 /** 
  * Central registry of all DOM elements used by the application.
- * Facilitates easy updates if the HTML structure changes.
- * @namespace elements
  */
 export const elements = {
     scriptsListContainer: document.getElementById('scriptsListContainer'),
@@ -36,14 +32,14 @@ export const elements = {
     processBtn: document.getElementById('processBtn'),
     toastContainer: document.getElementById('toastContainer'),
     segmentsContainer: document.getElementById('segmentsContainer'),
-    rightSidebarImages: document.getElementById('rightSidebarImages'),
+    rightSidebarClips: document.getElementById('rightSidebarClips'),
     deleteSelectedBtn: document.getElementById('deleteSelectedBtn'),
     pinSelectedBtn: document.getElementById('pinSelectedBtn'),
     editModeToggle: document.getElementById('editModeToggle'),
     darkModeToggle: document.getElementById('darkModeToggle'),
     translateToggle: document.getElementById('translateToggle'),
-    imageModal: document.getElementById('imageModal'),
-    modalImg: document.getElementById('modalImg'),
+    videoModal: document.getElementById('videoModal'),
+    videoIframe: document.getElementById('videoIframe'),
     modalCaption: document.getElementById('modalCaption'),
     closeModal: document.querySelector('.close-modal'),
     resizer: document.getElementById('resizer'),
@@ -53,52 +49,27 @@ export const elements = {
 };
 
 /**
- * Determines the primary mapping strategy for AI processing.
- * Currently defaults to 'dense' for high-retention visual sequences.
- * 
- * @function getPrimarySource
- * @returns {string} The primary source/strategy name.
+ * Returns the primary source strategy name for AI processing.
  */
 export function getPrimarySource() {
     return 'dense';
 }
 
 /**
- * Retrieves the currently selected image sources/scrapers from the UI settings.
- * Currently hardcoded to 'pinterest' but designed for future multi-source expansion.
- * 
- * @function getSelectedSources
- * @returns {string[]} Array of active source names.
- */
-export function getSelectedSources() {
-    return ['pinterest'];
-}
-
-/**
- * Generates a default set of segments from raw script text.
- * It uses double newlines (paragraphs) as the delimiter.
- * Each segment is initialized with empty keywords and image arrays.
- * 
- * @function createDefaultSegments
- * @param {string} text - The raw narration script text.
- * @returns {Array<Object>} Array of initialized segment objects.
+ * Generates default segments from raw script text using paragraph splitting.
  */
 export function createDefaultSegments(text) {
     return text.split(/\n\s*\n/).filter(p => p.trim()).map((p, i) => ({
         id: i,
         text: p.trim(),
         keywords: [],
+        clips: [],
         images: []
     }));
 }
 
 /**
- * Displays a non-blocking toast notification to the user.
- * 
- * @function showToast
- * @param {string} message - The text content of the notification.
- * @param {string} [type='info'] - The styling category (info, success, error).
- * @param {number} [duration=5000] - Time in milliseconds before the toast disappears.
+ * Toast notification system.
  */
 export function showToast(message, type = 'info', duration = 5000) {
     if (!elements.toastContainer) return;
@@ -106,11 +77,7 @@ export function showToast(message, type = 'info', duration = 5000) {
     toast.className = `toast ${type}`;
     toast.textContent = message;
     elements.toastContainer.appendChild(toast);
-    
-    // Trigger reflow to ensure the CSS transition plays
     setTimeout(() => toast.classList.add('show'), 10);
-    
-    // Auto-remove the element after duration + transition time
     setTimeout(() => {
         toast.classList.remove('show');
         setTimeout(() => toast.remove(), 300);
@@ -119,12 +86,6 @@ export function showToast(message, type = 'info', duration = 5000) {
 
 /**
  * Sets the application's global status message.
- * Optionally triggers a toast notification as well.
- * 
- * @function setStatus
- * @param {string} text - The status message.
- * @param {boolean} [showLoader=false] - Reserved for future loading spinner logic.
- * @param {boolean} [isToast=true] - Whether to show the message as a toast notification.
  */
 export function setStatus(text, showLoader = false, isToast = true) {
     if (text && isToast) {
@@ -133,11 +94,7 @@ export function setStatus(text, showLoader = false, isToast = true) {
 }
 
 /**
- * Toggles the 'disabled' attribute on primary navigation and action buttons.
- * Used during long-running async tasks like AI processing.
- * 
- * @function toggleButtons
- * @param {boolean} disabled - Whether the buttons should be inactive.
+ * Toggles the disabled state on primary action buttons.
  */
 export function toggleButtons(disabled) {
     elements.processBtn.disabled = disabled;
@@ -145,32 +102,23 @@ export function toggleButtons(disabled) {
 }
 
 /**
- * Navigates the UI back to the initial script list view.
- * Hides all script-specific editors and image sidebars.
- * 
- * @function showScriptsList
+ * Navigates back to the initial script list view.
  */
 export function showScriptsList() {
-    elements.scriptsListContainer.style.display = 'block';
-    elements.scriptActions.style.display = 'none';
-    elements.activeScriptHeader.style.display = 'none';
-    elements.editorContainer.style.display = 'none';
-    elements.segmentsContainer.innerHTML = '';
-    elements.rightSidebarImages.innerHTML = '<p>Select a segment to view images.</p>';
+    if (elements.scriptsListContainer) elements.scriptsListContainer.style.display = 'block';
+    if (elements.scriptActions) elements.scriptActions.style.display = 'none';
+    if (elements.activeScriptHeader) elements.activeScriptHeader.style.display = 'none';
+    if (elements.editorContainer) elements.editorContainer.style.display = 'none';
+    if (elements.segmentsContainer) elements.segmentsContainer.innerHTML = '';
+    if (elements.rightSidebarClips) elements.rightSidebarClips.innerHTML = '<p>Select a segment to view clips.</p>';
     setStatus('Select a script to begin.');
 }
 
 /**
- * Renders the state.processedSegments into interactive blocks in the main content area.
- * Handles both read-only (Segments Mode) and interactive keyword editing (Edit Mode).
- * Words in segment text are wrapped in clickable spans for manual keyword selection.
- * 
- * @function renderSegments
- * @param {Function} onKeywordClick - Callback invoked when a keyword tag is clicked.
+ * Renders state.processedSegments into interactive blocks.
  */
 export function renderSegments(onKeywordClick) {
-    elements.segmentsContainer.innerHTML = '';
-    // Store the callback for use by addManualKeyword
+    if (elements.segmentsContainer) elements.segmentsContainer.innerHTML = '';
     _onKeywordClick = onKeywordClick;
 
     state.processedSegments.forEach((segment, idx) => {
@@ -178,11 +126,10 @@ export function renderSegments(onKeywordClick) {
         const colorIdx = (idx % 5) + 1;
         block.className = `segment-block color-${colorIdx} ${idx === state.activeSegmentIndex ? 'active' : ''}`;
         
-        // Render Segment Text with interactive word spans
+        // Render Segment Text
         const textDiv = document.createElement('div');
         textDiv.className = 'segment-block-text';
         
-        // Inline editing support for segments (enabled only in Edit Mode)
         if (state.isEditMode) {
             textDiv.textContent = segment.text;
             textDiv.contentEditable = true;
@@ -191,7 +138,6 @@ export function renderSegments(onKeywordClick) {
             });
             textDiv.addEventListener('blur', () => syncStateWithBackend());
         } else {
-            // Wrap each word in a <span> for clickable keyword selection
             _renderWordSpans(textDiv, segment.text, idx, onKeywordClick);
         }
         
@@ -199,7 +145,6 @@ export function renderSegments(onKeywordClick) {
         const keywordsDiv = document.createElement('div');
         keywordsDiv.className = 'segment-block-keywords';
         segment.keywords.forEach((keyword, kIdx) => {
-            // Visual separator for grouping keywords (e.g., from the same anchor)
             if (keyword === '|') {
                 const separator = document.createElement('span');
                 separator.className = 'keyword-separator';
@@ -211,7 +156,7 @@ export function renderSegments(onKeywordClick) {
             const tag = document.createElement('span');
             tag.className = 'keyword-tag';
             
-            // Handle provider-prefixed keywords (e.g., "nasa: galaxy")
+            // Handle provider-prefixed keywords (e.g., "youtube: keyword")
             let displayKeyword = keyword;
             let provider = null;
             if (keyword.includes(':')) {
@@ -222,12 +167,11 @@ export function renderSegments(onKeywordClick) {
                 tag.classList.add(`provider-${provider}`);
             }
             
-            // We wrap the text in a span so edit-mode only affects the text, not the delete button
             const textSpan = document.createElement('span');
             textSpan.textContent = displayKeyword;
             tag.appendChild(textSpan);
 
-            // Add delete button
+            // Delete button
             const deleteBtn = document.createElement('span');
             deleteBtn.innerHTML = '&times;';
             deleteBtn.className = 'keyword-delete-icon';
@@ -235,23 +179,19 @@ export function renderSegments(onKeywordClick) {
             deleteBtn.contentEditable = false;
             deleteBtn.onclick = (e) => {
                 e.stopPropagation();
-                // Remove keyword
                 segment.keywords.splice(kIdx, 1);
-                // Save and re-render
                 syncStateWithBackend().then(() => renderSegments(onKeywordClick || _onKeywordClick));
             };
             tag.appendChild(deleteBtn);
 
-            // Mark tag as 'downloaded' if images already exist for this keyword/segment
+            // Mark as downloaded if clips exist
             const isDownloaded = (segment.downloaded_keywords && segment.downloaded_keywords.includes(keyword)) || 
-                                 (segment.images && segment.images.some(img => 
-                                    (img.keyword && img.keyword.toLowerCase() === keyword.toLowerCase()) ||
-                                    (typeof img === 'string' && img.toLowerCase().includes(keyword.toLowerCase().replace(/ /g, '_'))) ||
-                                    (img.path && img.path.toLowerCase().includes(keyword.toLowerCase().replace(/ /g, '_')))
+                                 (segment.clips && segment.clips.some(clip => 
+                                    clip.keyword && clip.keyword.toLowerCase() === keyword.toLowerCase()
                                  ));
             if (isDownloaded) tag.classList.add('downloaded');
 
-            // Interactive behavior for tags
+            // Interactive behavior
             if (state.isEditMode) {
                 textSpan.contentEditable = true;
                 textSpan.addEventListener('input', (e) => {
@@ -261,9 +201,8 @@ export function renderSegments(onKeywordClick) {
             } else {
                 tag.onclick = (e) => {
                     e.stopPropagation();
-                    // Prevent duplicate download requests for already downloaded assets
                     if (tag.classList.contains('downloaded')) {
-                        console.log(`Images already exist for "${keyword}", skipping request.`);
+                        console.log(`Clips already exist for "${keyword}", skipping.`);
                         return;
                     }
                     if (onKeywordClick) onKeywordClick(idx, keyword, tag);
@@ -275,18 +214,17 @@ export function renderSegments(onKeywordClick) {
         block.appendChild(textDiv);
         block.appendChild(keywordsDiv);
         
-        // Clicking a block activates it and shows associated images in the right sidebar
         block.addEventListener('click', () => {
             document.querySelectorAll('.segment-block').forEach(b => b.classList.remove('active'));
             block.classList.add('active');
             state.activeSegmentIndex = idx;
-            showImages(idx);
+            showClips(idx);
         });
 
-        elements.segmentsContainer.appendChild(block);
+        if (elements.segmentsContainer) elements.segmentsContainer.appendChild(block);
     });
 
-    // Append "Add Segment" button at the bottom of the segments list
+    // Add Segment button
     const addBtn = document.createElement('button');
     addBtn.className = 'add-segment-btn';
     addBtn.id = 'addSegmentBtnInline';
@@ -295,44 +233,26 @@ export function renderSegments(onKeywordClick) {
         e.stopPropagation();
         addManualSegment(onKeywordClick);
     });
-    elements.segmentsContainer.appendChild(addBtn);
+    if (elements.segmentsContainer) elements.segmentsContainer.appendChild(addBtn);
 }
 
-/**
- * Stored reference to the keyword click callback for use by addManualKeyword.
- * @private
- * @type {Function|null}
- */
 let _onKeywordClick = null;
 
 /**
- * Renders the text of a segment as individual word <span> elements.
- * Clicking a word adds it as a keyword. Selecting multiple words (phrase) via
- * native text selection adds the entire phrase as a keyword.
- * 
- * @function _renderWordSpans
- * @private
- * @param {HTMLElement} container - The DOM element to populate with word spans.
- * @param {string} text - The raw segment text.
- * @param {number} segmentIdx - The index of the segment in state.processedSegments.
- * @param {Function} onKeywordClick - Callback for triggering downloads.
+ * Renders text as clickable word spans for keyword selection.
  */
 function _renderWordSpans(container, text, segmentIdx, onKeywordClick) {
-    // Split text preserving whitespace tokens
     const tokens = text.split(/(\s+)/);
     tokens.forEach(token => {
         if (/^\s+$/.test(token)) {
-            // Whitespace token — render as-is
             container.appendChild(document.createTextNode(token));
         } else if (token.length > 0) {
             const span = document.createElement('span');
             span.className = 'segment-word';
             span.textContent = token;
 
-            // Single-word click handler
             span.addEventListener('click', (e) => {
                 e.stopPropagation();
-                // If the user has an active text selection (phrase), don't fire single-word click
                 const sel = window.getSelection();
                 if (sel && sel.toString().trim().length > 0) return;
 
@@ -346,7 +266,6 @@ function _renderWordSpans(container, text, segmentIdx, onKeywordClick) {
         }
     });
 
-    // Mouseup handler for detecting multi-word phrase selections
     container.addEventListener('mouseup', (e) => {
         const sel = window.getSelection();
         if (!sel || sel.isCollapsed) return;
@@ -354,12 +273,10 @@ function _renderWordSpans(container, text, segmentIdx, onKeywordClick) {
         const selectedText = sel.toString().trim();
         if (selectedText.length === 0 || selectedText.split(/\s+/).length < 2) return;
 
-        // Verify selection is within this container
         if (!container.contains(sel.anchorNode) || !container.contains(sel.focusNode)) return;
 
         addManualKeyword(segmentIdx, selectedText, onKeywordClick);
 
-        // Highlight selected word spans
         const wordSpans = container.querySelectorAll('.segment-word');
         wordSpans.forEach(ws => {
             if (sel.containsNode(ws, true)) {
@@ -367,27 +284,18 @@ function _renderWordSpans(container, text, segmentIdx, onKeywordClick) {
             }
         });
 
-        // Clear the browser selection after capturing the phrase
         sel.removeAllRanges();
-
         showToast(`Added phrase: "${selectedText}"`, 'success', 3000);
     });
 }
 
 /**
- * Adds a manually selected keyword to a segment's keyword list.
- * Updates the state, re-renders the UI, and triggers the initial download.
- * 
- * @function addManualKeyword
- * @param {number} segmentIdx - The index of the segment.
- * @param {string} keyword - The keyword text to add.
- * @param {Function} onKeywordClick - Callback to trigger the download queue.
+ * Adds a manually selected keyword and triggers clip fetching.
  */
 export function addManualKeyword(segmentIdx, keyword, onKeywordClick) {
     const segment = state.processedSegments[segmentIdx];
     if (!segment) return;
 
-    // Avoid adding duplicate keywords (case-insensitive)
     const normalised = keyword.toLowerCase();
     if (segment.keywords.some(k => k.toLowerCase() === normalised)) {
         showToast(`"${keyword}" is already a keyword.`, 'info', 2000);
@@ -395,13 +303,9 @@ export function addManualKeyword(segmentIdx, keyword, onKeywordClick) {
     }
 
     segment.keywords.push(keyword);
-
-    // Re-render segments to show the new tag
     renderSegments(onKeywordClick || _onKeywordClick);
     
-    // Save state to backend to ensure DB is synced before downloading
     syncStateWithBackend().then(() => {
-        // Find the newly created keyword tag and trigger download
         const blocks = elements.segmentsContainer.querySelectorAll('.segment-block');
         const targetBlock = blocks[segmentIdx];
         if (targetBlock) {
@@ -417,24 +321,20 @@ export function addManualKeyword(segmentIdx, keyword, onKeywordClick) {
 }
 
 /**
- * Creates a new empty segment and appends it to the segments list.
- * The user can then click words or edit it in Edit Mode.
- * 
- * @function addManualSegment
- * @param {Function} onKeywordClick - Callback for keyword downloads.
+ * Creates a new empty segment.
  */
 export function addManualSegment(onKeywordClick) {
     const newSegment = {
         id: state.processedSegments.length,
         text: '(New segment — edit in Edit Mode)',
         keywords: [],
+        clips: [],
         images: []
     };
     state.processedSegments.push(newSegment);
     renderSegments(onKeywordClick || _onKeywordClick);
     syncStateWithBackend();
 
-    // Auto-scroll to the new segment
     const blocks = elements.segmentsContainer.querySelectorAll('.segment-block');
     const lastBlock = blocks[blocks.length - 1];
     if (lastBlock) lastBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -443,168 +343,179 @@ export function addManualSegment(onKeywordClick) {
 }
 
 /**
- * Populates the right sidebar with images associated with the active segment.
- * Images are grouped by their source (e.g., Pinterest, Unsplash).
- * 
- * @function showImages
- * @param {number} idx - The index of the segment to display images for.
+ * Populates the right sidebar with YouTube clip cards for the active segment.
  */
-export function showImages(idx) {
+export function showClips(idx) {
     const segment = state.processedSegments[idx];
-    elements.rightSidebarImages.innerHTML = '';
-    state.selectedImagePaths.clear();
+    if (elements.rightSidebarClips) elements.rightSidebarClips.innerHTML = '';
+    state.selectedClipIds.clear();
     updateDeleteButtonVisibility();
 
-    if (segment.images && segment.images.length > 0) {
-        // Group images by provider/source
-        const sources = {};
-        segment.images.forEach(imgData => {
-            const imgPath = typeof imgData === 'string' ? imgData : imgData.path;
-            const source = (typeof imgData === 'object' ? imgData.source : 'unknown') || 'unknown';
-            
-            if (!sources[source]) sources[source] = [];
-            sources[source].push(imgPath);
+    const clips = segment.clips || [];
+
+    if (clips.length > 0) {
+        // Group clips by keyword
+        const groups = {};
+        clips.forEach(clip => {
+            const kw = clip.keyword || 'general';
+            if (!groups[kw]) groups[kw] = [];
+            groups[kw].push(clip);
         });
 
-        // Render each source group
-        Object.keys(sources).sort().forEach(source => {
-            const sourceBox = document.createElement('div');
-            sourceBox.className = `source-box source-${source}`;
-            
+        Object.keys(groups).sort().forEach(keyword => {
+            const groupBox = document.createElement('div');
+            groupBox.className = 'source-box source-youtube';
+
             const title = document.createElement('h4');
-            title.textContent = source.charAt(0).toUpperCase() + source.slice(1);
-            sourceBox.appendChild(title);
-            
+            title.innerHTML = `<span style="color:#ff0000">▶</span> ${keyword}`;
+            groupBox.appendChild(title);
+
             const grid = document.createElement('div');
-            grid.className = 'image-grid';
-            
-            sources[source].forEach(imgPath => {
-                const wrapper = document.createElement('div');
-                wrapper.className = 'image-wrapper';
-                wrapper.setAttribute('data-path', imgPath);
+            grid.className = 'clip-grid';
+
+            groups[keyword].forEach(clip => {
+                const card = document.createElement('div');
+                card.className = 'clip-card';
+                card.setAttribute('data-clip-id', clip.id);
+
+                // Thumbnail
+                const thumbWrapper = document.createElement('div');
+                thumbWrapper.className = 'clip-thumbnail-wrapper';
                 
-                // Visual indicator for pinned images
-                const imgObj = segment.images.find(i => (typeof i === 'string' ? i : i.path) === imgPath);
-                if (imgObj && imgObj.pinned) {
-                    wrapper.classList.add('pinned');
+                const thumb = document.createElement('img');
+                // Use local thumbnail if available, otherwise YouTube URL
+                if (clip.thumbnail_path) {
+                    let src = clip.thumbnail_path;
+                    if (!src.startsWith('/')) src = '/' + src;
+                    thumb.src = src;
+                } else {
+                    thumb.src = clip.thumbnail || `https://i.ytimg.com/vi/${clip.video_id}/hqdefault.jpg`;
+                }
+                thumb.loading = 'lazy';
+                thumb.alt = clip.title || '';
+                thumbWrapper.appendChild(thumb);
+
+                // Timestamp badge
+                if (clip.timestamp_start > 0) {
+                    const badge = document.createElement('span');
+                    badge.className = 'clip-timestamp-badge';
+                    const mins = Math.floor(clip.timestamp_start / 60);
+                    const secs = Math.floor(clip.timestamp_start % 60);
+                    badge.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+                    thumbWrapper.appendChild(badge);
                 }
 
-                const img = document.createElement('img');
-                // Ensure we use a relative path for the <img> src
-                let relativePath = imgPath.split('narrateImage/')[1] || imgPath;
-                if (relativePath.startsWith('/')) relativePath = relativePath.substring(1);
-                img.src = '/' + relativePath;
-                img.loading = 'lazy';
-                
-                // Toggle selection for bulk actions (pin/delete)
-                wrapper.onclick = (e) => {
+                // Play icon overlay
+                const playIcon = document.createElement('div');
+                playIcon.className = 'clip-play-icon';
+                playIcon.innerHTML = '▶';
+                thumbWrapper.appendChild(playIcon);
+
+                card.appendChild(thumbWrapper);
+
+                // Info section
+                const info = document.createElement('div');
+                info.className = 'clip-info';
+
+                const clipTitle = document.createElement('div');
+                clipTitle.className = 'clip-title';
+                clipTitle.textContent = clip.title || 'Untitled';
+                clipTitle.title = clip.title || '';
+                info.appendChild(clipTitle);
+
+                if (clip.transcript_snippet) {
+                    const snippet = document.createElement('div');
+                    snippet.className = 'clip-snippet';
+                    snippet.textContent = `"${clip.transcript_snippet}"`;
+                    info.appendChild(snippet);
+                }
+
+                card.appendChild(info);
+
+                // Click to select
+                card.onclick = (e) => {
                     e.stopPropagation();
-                    const isSelected = wrapper.classList.toggle('selected');
+                    const isSelected = card.classList.toggle('selected');
                     if (isSelected) {
-                        state.selectedImagePaths.add(imgPath);
+                        state.selectedClipIds.add(clip.id);
                     } else {
-                        state.selectedImagePaths.delete(imgPath);
+                        state.selectedClipIds.delete(clip.id);
                     }
                     updateDeleteButtonVisibility();
                 };
 
-                // Double click zooms the image into the modal view
-                wrapper.ondblclick = (e) => {
+                // Double click to open YouTube at timestamp
+                card.ondblclick = (e) => {
                     e.stopPropagation();
-                    elements.imageModal.style.display = "flex";
-                    elements.modalImg.src = img.src;
-                    elements.modalCaption.innerHTML = imgPath.split('/').pop();
+                    const startSec = Math.floor(clip.timestamp_start || 0);
+                    const embedUrl = `https://www.youtube.com/embed/${clip.video_id}?start=${startSec}&autoplay=1`;
+                    
+                    if (elements.videoModal && elements.videoIframe) {
+                        elements.videoIframe.src = embedUrl;
+                        elements.modalCaption.textContent = clip.title || '';
+                        elements.videoModal.style.display = 'flex';
+                    } else {
+                        window.open(`${clip.url}&t=${startSec}`, '_blank');
+                    }
                 };
 
-                wrapper.appendChild(img);
-                grid.appendChild(wrapper);
+                grid.appendChild(card);
             });
-            
-            sourceBox.appendChild(grid);
-            elements.rightSidebarImages.appendChild(sourceBox);
+
+            groupBox.appendChild(grid);
+            if (elements.rightSidebarClips) elements.rightSidebarClips.appendChild(groupBox);
         });
     } else {
-        elements.rightSidebarImages.innerHTML = '<p>No images downloaded for this segment yet. Click keywords to download.</p>';
+        if (elements.rightSidebarClips) elements.rightSidebarClips.innerHTML = '<p>No clips found for this segment yet. Click keywords to search YouTube.</p>';
     }
 }
 
 /**
- * Updates the visual state and tooltips of image action buttons (Pin/Delete).
- * Disables buttons if no images are currently selected.
- * 
- * @function updateDeleteButtonVisibility
+ * Updates the visual state of action buttons based on selection.
  */
 export function updateDeleteButtonVisibility() {
-    const hasSelection = state.selectedImagePaths.size > 0;
+    const hasSelection = state.selectedClipIds.size > 0;
     
-    // Adjust opacity and interaction based on selection state
-    elements.deleteSelectedBtn.style.opacity = hasSelection ? '1' : '0.4';
-    elements.deleteSelectedBtn.style.pointerEvents = hasSelection ? 'auto' : 'none';
-    elements.pinSelectedBtn.style.opacity = hasSelection ? '1' : '0.4';
-    elements.pinSelectedBtn.style.pointerEvents = hasSelection ? 'auto' : 'none';
+    if (elements.deleteSelectedBtn) {
+        elements.deleteSelectedBtn.style.opacity = hasSelection ? '1' : '0.4';
+        elements.deleteSelectedBtn.style.pointerEvents = hasSelection ? 'auto' : 'none';
+    }
+    if (elements.pinSelectedBtn) {
+        elements.pinSelectedBtn.style.opacity = hasSelection ? '1' : '0.4';
+        elements.pinSelectedBtn.style.pointerEvents = hasSelection ? 'auto' : 'none';
+    }
     
     if (hasSelection) {
-        elements.deleteSelectedBtn.title = `Delete Selected (${state.selectedImagePaths.size})`;
-        elements.pinSelectedBtn.title = `Pin Selected (${state.selectedImagePaths.size})`;
+        if (elements.deleteSelectedBtn) elements.deleteSelectedBtn.title = `Delete Selected (${state.selectedClipIds.size})`;
+        if (elements.pinSelectedBtn) elements.pinSelectedBtn.title = `Pin Selected (${state.selectedClipIds.size})`;
     } else {
-        elements.deleteSelectedBtn.title = 'Delete Selected';
-        elements.pinSelectedBtn.title = 'Pin Selected';
+        if (elements.deleteSelectedBtn) elements.deleteSelectedBtn.title = 'Delete Selected';
+        if (elements.pinSelectedBtn) elements.pinSelectedBtn.title = 'Pin Selected';
     }
 }
 
 /**
- * Toggles selection for ALL currently visible images in the sidebar.
- * Used for rapid bulk management.
- * 
- * @function toggleSelectAll
+ * Persists pinned status for all selected clips.
  */
-export function toggleSelectAll() {
-    const images = elements.rightSidebarImages.querySelectorAll('.image-wrapper');
-    if (images.length === 0) return;
-
-    const allSelected = Array.from(images).every(img => img.classList.contains('selected'));
+export async function pinSelectedClips() {
+    if (state.selectedClipIds.size === 0) return;
     
-    images.forEach(wrapper => {
-        const imgPath = wrapper.getAttribute('data-path');
-        if (allSelected) {
-            wrapper.classList.remove('selected');
-            state.selectedImagePaths.delete(imgPath);
-        } else {
-            wrapper.classList.add('selected');
-            state.selectedImagePaths.add(imgPath);
-        }
-    });
-    
-    updateDeleteButtonVisibility();
-}
-
-/**
- * Persists the "pinned" status for all currently selected images to the server.
- * Pinned images are protected from being cleaned up as 'orphans'.
- * 
- * @async
- * @function pinSelectedImages
- */
-export async function pinSelectedImages() {
-    if (state.selectedImagePaths.size === 0) return;
-    
-    const pathsToPin = Array.from(state.selectedImagePaths);
+    const idsToPin = Array.from(state.selectedClipIds);
     try {
-        setStatus(`Pinning ${pathsToPin.length} images...`, true);
-        for (const path of pathsToPin) {
-            await pinImage(path, true);
+        setStatus(`Pinning ${idsToPin.length} clips...`, true);
+        for (const id of idsToPin) {
+            await pinClip(id, true);
         }
         
-        // Refresh the image grid to show pin icons
         if (state.activeSegmentIndex !== -1) {
-            showImages(state.activeSegmentIndex);
+            showClips(state.activeSegmentIndex);
         }
         
-        state.selectedImagePaths.clear();
+        state.selectedClipIds.clear();
         updateDeleteButtonVisibility();
-        setStatus('Images pinned successfully.');
+        setStatus('Clips pinned successfully.');
     } catch (err) {
-        console.error('Failed to pin images:', err);
-        setStatus('Error pinning images', false, true);
+        console.error('Failed to pin clips:', err);
+        setStatus('Error pinning clips', false, true);
     }
 }

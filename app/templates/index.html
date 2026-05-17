@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NarrateImage - AI Image Suggester</title>
+    <title>NarrateImage - AI Clip Finder</title>
+    <meta name="description" content="Find YouTube video clips for your narration scripts using AI-powered keyword extraction">
     <link rel="icon" type="image/png" href="/static/favicon-96x96.png" sizes="96x96" />
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
     <link rel="shortcut icon" href="/static/favicon.ico" />
@@ -14,11 +15,6 @@
 </head>
 <body>
     <div class="container-fluid">
-        <!-- <header class="app-header"> -->
-            <!-- <img src="/static/favicon.svg" alt="NarrateImage Logo" class="app-logo"> -->
-            <!-- <h1>NarrateImage</h1> -->
-        <!-- </header> -->
-        
         <div class="main-layout">
             <aside class="sidebar">
                 <div id="activeScriptHeader">
@@ -41,76 +37,11 @@
                 </div>
 
                 <div class="settings-card sidebar-card">
-                    <h3>Image Sources</h3>
-                    <div class="toggle-container">
-                        <span class="toggle-label">Unsplash</span>
-                        <label class="switch">
-                            <input type="checkbox" id="unsplashToggle" checked>
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                    <div class="toggle-container">
-                        <span class="toggle-label">Pinterest</span>
-                        <label class="switch">
-                            <input type="checkbox" id="pinterestToggle" checked>
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                    <div class="toggle-container">
-                        <span class="toggle-label">Pexels</span>
-                        <label class="switch">
-                            <input type="checkbox" id="pexelsToggle" checked>
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                    <div class="toggle-container">
-                        <span class="toggle-label">Pixabay</span>
-                        <label class="switch">
-                            <input type="checkbox" id="pixabayToggle" checked>
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                    <div class="toggle-container">
-                        <span class="toggle-label">Picsum</span>
-                        <label class="switch">
-                            <input type="checkbox" id="picsumToggle" checked>
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                    <div class="toggle-container">
-                        <span class="toggle-label">NASA</span>
-                        <label class="switch">
-                            <input type="checkbox" id="nasaToggle" checked>
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                    <div class="toggle-container">
-                        <span class="toggle-label">Met Museum</span>
-                        <label class="switch">
-                            <input type="checkbox" id="metToggle" checked>
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                    <div class="toggle-container">
-                        <span class="toggle-label">Dicebear</span>
-                        <label class="switch">
-                            <input type="checkbox" id="dicebearToggle" checked>
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                    <div class="toggle-container">
-                        <span class="toggle-label">Robohash</span>
-                        <label class="switch">
-                            <input type="checkbox" id="robohashToggle" checked>
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                    <div class="toggle-container">
-                        <span class="toggle-label">UI Avatars</span>
-                        <label class="switch">
-                            <input type="checkbox" id="uiavatarsToggle" checked>
-                            <span class="slider"></span>
-                        </label>
+                    <h3>Clip Source</h3>
+                    <div class="youtube-source-indicator">
+                        <span class="youtube-icon">▶</span>
+                        <span>YouTube</span>
+                        <span class="source-active-badge">Active</span>
                     </div>
                 </div>
 
@@ -162,28 +93,29 @@
                     </div>
                     <div id="statusMessage" style="display: none;">Ready</div>
                     <div class="header-stats" style="display: none;">
-                        <div id="speedStat" class="stat-item" title="Download Speed">
-                            <span>⚡</span> <span id="speedValue">0</span> KB/s
-                        </div>
-                        <div id="timeStat" class="stat-item" title="Task Time">
+                        <div id="timeStat" class="stat-item" title="Search Time">
                             <span>⏱️</span> <span id="timeValue">0</span>s
                         </div>
                     </div>
                 </div>
-                <div id="rightSidebarImages" class="right-sidebar-images">
-                    <p>Select a segment to view images.</p>
+                <div id="rightSidebarClips" class="right-sidebar-clips">
+                    <p>Select a segment to view clips.</p>
                 </div>
             </aside>
         </div>
     </div>
-    <div id="imageModal" class="modal">
+
+    <!-- Video Modal (YouTube Embed) -->
+    <div id="videoModal" class="modal video-modal">
         <span class="close-modal">&times;</span>
-        <img class="modal-content" id="modalImg">
+        <div class="video-modal-content">
+            <iframe id="videoIframe" allowfullscreen allow="autoplay; encrypted-media"></iframe>
+        </div>
         <div id="modalCaption"></div>
     </div>
 
     <div id="toastContainer" class="toast-container"></div>
 
-    <script type="module" src="/static/js/main.js"></script>
+    <script type="module" src="/static/js/main.js?v=1.0.1"></script>
 </body>
 </html>

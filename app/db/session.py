@@ -56,6 +56,29 @@ def init_db():
             api_type TEXT DEFAULT 'scraper',
             FOREIGN KEY (anchor_id) REFERENCES text_anchors(id)
         );
+
+        CREATE TABLE IF NOT EXISTS clips (
+            id TEXT PRIMARY KEY,
+            anchor_id TEXT,
+            video_id TEXT NOT NULL,
+            video_title TEXT,
+            video_url TEXT NOT NULL,
+            thumbnail_path TEXT,
+            thumbnail_url TEXT,
+            timestamp_start REAL,
+            timestamp_end REAL,
+            transcript_snippet TEXT,
+            keyword TEXT,
+            source TEXT DEFAULT 'youtube',
+            status TEXT DEFAULT 'active',
+            clip_file_path TEXT,
+            user_touched BOOLEAN DEFAULT FALSE,
+            pinned_to_anchor TEXT,
+            pin_note TEXT,
+            last_used DATETIME,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (anchor_id) REFERENCES text_anchors(id)
+        );
         """)
     
     # Ensure columns exist (for legacy DBs)
