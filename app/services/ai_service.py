@@ -266,4 +266,22 @@ class AIService:
             
         return {"segments": all_segments, "vibe": vibe_analysis}
 
+    async def translate_keyword(self, keyword: str) -> str:
+        """Translates a keyword to English if it's not already."""
+        prompt = f"Translate the following keyword or phrase to English. If it is already in English, return it exactly as is. Output ONLY the translated string, no quotes, no extra text:\n\n{keyword}"
+        try:
+            response = await asyncio.to_thread(
+                self.client.chat.completions.create,
+                model="deepseek-chat",
+                messages=[
+                    {"role": "system", "content": "You are a translation assistant. Provide only the direct translation."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=50
+            )
+            return response.choices[0].message.content.strip()
+        except Exception as e:
+            logger.error(f"Error translating keyword: {e}")
+            return keyword
+
 ai_service = AIService()
