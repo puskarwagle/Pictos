@@ -35,6 +35,64 @@
     font-size: 1.1rem;
     margin-bottom: 10px;
     min-height: 1.5em;
+    line-height: 1.8;
+}
+
+/* Interactive word spans for manual keyword selection */
+.segment-word {
+    cursor: pointer;
+    border-radius: 3px;
+    padding: 1px 2px;
+    transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.segment-word:hover {
+    background-color: rgba(230, 0, 35, 0.15);
+    box-shadow: 0 1px 3px rgba(230, 0, 35, 0.2);
+}
+
+.dark-mode .segment-word:hover {
+    background-color: rgba(230, 0, 35, 0.25);
+}
+
+/* Visual feedback when a word has been selected as a keyword */
+.segment-word.selected-as-keyword {
+    background-color: rgba(76, 175, 80, 0.2);
+    color: var(--text-primary);
+    border-bottom: 2px solid #4caf50;
+}
+
+/* Phrase selection highlight */
+.segment-word.phrase-highlight {
+    background-color: rgba(255, 152, 0, 0.25);
+}
+
+/* Add Segment button */
+.add-segment-btn {
+    width: 100%;
+    padding: 10px 16px;
+    background: transparent;
+    border: 2px dashed var(--sidebar-border);
+    border-radius: 8px;
+    color: var(--status-text);
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.add-segment-btn:hover {
+    border-color: #e60023;
+    color: #e60023;
+    background: rgba(230, 0, 35, 0.05);
+}
+
+.dark-mode .add-segment-btn:hover {
+    background: rgba(230, 0, 35, 0.1);
 }
 
 .segment-block-keywords {
@@ -65,6 +123,9 @@
     border: 1px solid rgba(255, 255, 255, 0.1);
     cursor: pointer;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    display: inline-flex;
+    align-items: center;
+    position: relative;
 }
 
 .keyword-tag:hover {
@@ -83,6 +144,45 @@
 .keyword-tag.downloaded {
     background: #4caf50 !important;
     color: white !important;
+}
+
+.keyword-delete-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #e60023;
+    color: white;
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    z-index: 10;
+    
+    /* Hide by default */
+    opacity: 0;
+    pointer-events: none;
+    /* When mouse leaves, hide immediately (0.2s fade) */
+    transition: opacity 0.2s ease, transform 0.2s ease, background 0.2s ease;
+}
+
+.keyword-tag:hover .keyword-delete-icon {
+    opacity: 1;
+    pointer-events: auto;
+    /* Delay the appearance by 3 seconds */
+    transition: opacity 0.2s ease 3s, transform 0.2s ease 3s, background 0.2s ease;
+}
+
+.keyword-delete-icon:hover {
+    background: #ff1a1a;
+    transform: scale(1.15);
+    /* When hovering the icon itself, transitions should be instant (no 3s delay) */
+    transition: transform 0.2s ease, background 0.2s ease;
 }
 
 /* Provider Specific Tags */

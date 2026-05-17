@@ -1,11 +1,11 @@
-from typing import List, Optional
+from typing import List, Optional, Any
 from pydantic import BaseModel
 
 class ScriptSegment(BaseModel):
     id: int
     text: str
     keywords: List[str]
-    images: Optional[List[str]] = []
+    images: Optional[List[Any]] = []
 
 class ProcessRequest(BaseModel):
     filename: str
@@ -13,6 +13,10 @@ class ProcessRequest(BaseModel):
     source: Optional[str] = "pinterest"
 
 class DownloadRequest(BaseModel):
+    filename: str
+    segments: List[ScriptSegment]
+
+class SaveSegmentsRequest(BaseModel):
     filename: str
     segments: List[ScriptSegment]
 
@@ -35,3 +39,6 @@ class PinImageRequest(BaseModel):
     image_path: str
     pin: bool
     note: Optional[str] = None
+
+class TranslateRequest(BaseModel):
+    keyword: str

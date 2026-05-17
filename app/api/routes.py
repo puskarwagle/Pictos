@@ -17,7 +17,7 @@ from app.db.repository import (
 import difflib
 from app.models.api_models import (
     ProcessRequest, DownloadRequest, KeywordDownloadRequest,
-    DeleteImagesRequest, ApiFetchRequest, PinImageRequest
+    DeleteImagesRequest, ApiFetchRequest, PinImageRequest, TranslateRequest, SaveSegmentsRequest
 )
 from app.services.ai_service import ai_service
 from app.services.image_service import (
@@ -77,7 +77,7 @@ async def get_script_response(filename: str):
     stem = Path(filename).stem
     response_file = RESPONSES_DIR / f"{stem}.json"
     if not response_file.exists():
-        return []
+        raise HTTPException(status_code=404, detail="No cached response found")
     with open(response_file, "r") as f:
         data = json.load(f)
         segments = data.get("segments", data) if isinstance(data, dict) else data
@@ -219,6 +219,63 @@ async def pin_image(request: PinImageRequest):
     conn.commit()
     conn.close()
     return {"status": 'pinned' if request.pin else 'active'}
+
+@router.post("/api/translate")
+async def translate_keyword(request: TranslateRequest):
+    translated = await ai_service.translate_keyword(request.keyword)
+    return {"translated": translated}
+
+@router.post("/api/save-segments")
+async def save_segments(request: SaveSegmentsRequest):
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        script_id = get_script_id_by_filename(cursor, request.filename)
+        if not script_id:
+            script_id = create_script(cursor, request.filename)
+            
+        delete_segments_for_script(cursor, script_id)
+        
+        new_anchor_ids = set()
+        segments_data = []
+        for segment in request.segments:
+            seg_dict = segment.dict()
+            segments_data.append(seg_dict)
+            
+            anchor_id = find_or_create_anchor(conn, script_id, seg_dict.get("text", ""))
+            new_anchor_ids.add(anchor_id)
+            create_segment(cursor, script_id, anchor_id, seg_dict.get("id"), seg_dict.get("keywords", []))
+            
+        orphan_unused_images(cursor, script_id, list(new_anchor_ids))
+        conn.commit()
+        conn.close()
+        
+        # Save to JSON
+        stem = Path(request.filename).stem
+        response_file = RESPONSES_DIR / f"{stem}.json"
+        
+        vibe_data = None
+        if response_file.exists():
+            with open(response_file, "r", encoding="utf-8") as f:
+                try:
+                    old_data = json.load(f)
+                    vibe_data = old_data.get("vibe") if isinstance(old_data, dict) else None
+                except:
+                    pass
+        
+        out_data = {"segments": segments_data}
+        if vibe_data:
+            out_data["vibe"] = vibe_data
+            
+        with open(response_file, "w", encoding="utf-8") as f:
+            json.dump(out_data, f, indent=4, ensure_ascii=False)
+            
+        return {"status": "success"}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/", response_class=HTMLResponse)
 async def get_index():
