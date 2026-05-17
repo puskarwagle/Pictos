@@ -1,61 +1,93 @@
 # NarrateImage
 
-NarrateImage is a specialized tool for video creators (AI creators, documentary filmmakers, etc.) to streamline the process of finding visual assets. It uses AI to analyze your scripts, breaks them into logical segments, and manages a persistent library of visual assets linked to your content.
+NarrateImage is a specialized tool for video creators (AI creators, documentary filmmakers, etc.) to streamline the process of finding and managing visual assets. It uses AI to analyze your scripts, breaks them into logical segments, and manages a persistent, deduplicated library of visual assets linked directly to your text content.
 
-## Core Features
+---
 
-- **Interactive Script Analysis**: Breaks your script into meaningful segments with AI-generated visual keywords.
-- **Categorized Multi-Source Selection**: Choose from multiple image sources simultaneously using a categorized checkbox system:
-    - **Scrapers**: **Pinterest** (diagrams/infographics) and **Unsplash** (photography).
-    - **Photography APIs**: Lorem Picsum.
-    - **Art & Museum**: NASA Images, Metropolitan Museum of Art.
-    - **Avatars & Illustrations**: DiceBear, RoboHash, UI Avatars.
-- **Merged AI Keywords**: When multiple scrapers are selected, the AI generates optimized keyword sets for each, merged in the UI for comprehensive results.
-- **Robust Metadata Linking**: Uses a SQLite backend to anchor images to specific **text spans** (content-hashed) with advanced tracking for `last_used` and `user_touched` status.
-- **Smart Fuzzy Matching**: Automatically re-anchors images to sentences even after text edits (92% similarity threshold).
-- **Enhanced Image Pinning**: Lock 📌 images to a text anchor with optional **custom notes** to ensure they survive script re-segmentations.
-- **Two-Step Deduplication**: Prevents duplicates via **source URL** checks (pre-download) and **SHA-256 binary hashing** (post-download).
-- **Interactive Queue**: Fetch images by clicking keywords, managed by a concurrency queue (max 4 requests) with real-time speed (KB/s) and size metrics.
-- **Batch Operations**: Quickly manage your library with "Delete Selected" bulk actions.
-- **Persistent Resizable UI**: A modern, togglable Dark/Light mode interface with a **draggable sidebar** that remembers its dimensions and state via `localStorage`.
-- **Reference-Counted Maintenance**: The Garbage Collector safely purges files only when zero active or pinned records reference them, following a default **30-day TTL**.
+## 🏗 System Architecture & Data Flow
 
-## Tech Stack
+NarrateImage is built with a **Python (FastAPI)** backend and a **Vanilla JavaScript** frontend, using **SQLite3** for robust data persistence.
 
-- **Backend**: FastAPI (Python 3.13)
-- **Database**: SQLite3 (with advanced tracking columns)
-- **Frontend**: Vanilla JavaScript (ES6+), HTML5, CSS3 (BEM methodology)
-- **Scraping**: [Camoufox](https://github.com/HMaker/camoufox) (Anti-detect browser for stealth scraping)
-- **AI Integration**: OpenAI SDK (configured for **DeepSeek-V3**)
-- **Environment**: python-dotenv for secure configuration
+### High-Level Component Diagram
+```text
+[ Frontend (Vanilla JS) ] <--> [ API (FastAPI) ] <--> [ SQLite DB ]
+          |                        |                      |
+          |                        +--> [ AI Service (DeepSeek) ]
+          |                        +--> [ Provider Services (Scrapers/APIs) ]
+          +--> [ Local Storage (Images/Scripts) ]
+```
 
-## File Guide
+### Core Data Flow
+1.  **Ingestion:** The user places an `.md` script in `data/video_scripts/`.
+2.  **Analysis:** The AI (`ai_service.py`) chunks the script, performs vibe analysis, and generates a **Dense Visual Mapping** (anchors + keywords).
+3.  **Persistence:** 
+    -   Script text is stored and hashed into **Text Anchors**.
+    -   Images are downloaded and linked to these anchors in the `images` table.
+4.  **Retrieval:** The frontend (`ui.js`) renders segments. Clicking a keyword triggers the **Download Queue** (`queue.js`), which fetches assets via the backend.
+5.  **Deduplication:** The backend (`image_service.py`) ensures no duplicate images exist on disk by checking both source URLs and binary SHA-256 hashes.
 
-### Root Directory
-- `main.py`: Entry point for the FastAPI application.
-- `requirements.txt`: Project dependencies.
-- `app/`:
-    - `api/`: API routes (`routes.py`).
-    - `core/`: Configuration and constants (`config.py`).
-    - `db/`: Database session and repository logic (`session.py`, `repository.py`).
-    - `models/`: Pydantic models (`api_models.py`).
-    - `services/`: AI integration, image providers, and management services.
-    - `static/` & `templates/`: Frontend UI assets and layout.
-- `data/`: Local storage for scripts, images, and AI responses (Git ignored).
-- `resources/prompts/`: AI system prompts for different visual styles.
-- `scripts/`:
-    - `garbage_collect.py`: Purge unused assets with TTL logic.
-    - `migrate_to_db.py`: Utility to migrate legacy filesystem metadata to SQLite.
-- `tests/`: Comprehensive test suite.
+---
 
-## Setup Instructions
+## 🌟 Key Features
 
-### 1. Install Dependencies
+### 🧠 Intelligent Script Processing
+-   **DeepSeek Integration:** Uses the OpenAI SDK to communicate with DeepSeek-V3 for high-density keyword extraction.
+-   **Fuzzy Matching (92%):** When you edit your script, the system uses `difflib` to automatically re-anchor existing images to the updated text segments, preventing data loss during refinement.
+
+### 🖼 Advanced Asset Management
+-   **Two-Step Deduplication:**
+    -   **Pre-download:** Checks if the source URL already exists in the database.
+    -   **Post-download:** Performs a binary SHA-256 hash on the file. If it matches an existing file, the new one is deleted and the DB record points to the original.
+-   **Stable Pinning:** Pin 📌 images to specific text anchors. Pins survive script re-segmentation and are protected from the garbage collector.
+
+### ⚡️ Interactive Frontend
+-   **Concurrency-Limited Queue:** Manages background image downloads (max 4 parallel) with real-time speed (KB/s) and duration metrics.
+-   **Dual-View Orchestration:** Seamlessly switch between **Edit Mode** (raw text) and **Segments Mode** (interactive keywords and images).
+-   **Persistent UI State:** Remembers your Dark/Light mode preference and draggable sidebar width via `localStorage`.
+
+### 🧹 Automated Maintenance
+-   **Reference-Counted GC:** The `garbage_collect.py` script safely purges unused files only when zero active or pinned DB records reference them, following a configurable TTL.
+
+---
+
+## 📁 Directory Guide
+
+### `app/` (The Application Core)
+-   `api/routes.py`: The central hub for all HTTP endpoints.
+-   `core/config.py`: System-wide settings and directory initialization.
+-   `db/`:
+    -   `session.py`: SQLite connection management (WAL mode enabled).
+    -   `repository.py`: Low-level SQL queries and data access layer.
+-   `services/`:
+    -   `ai_service.py`: Script chunking, vibe analysis, and DeepSeek orchestration.
+    -   `image_service.py`: The logic for downloading, hashing, and deduping images.
+    -   `providers/`: Specialized scrapers (Pinterest/Unsplash) and API wrappers (NASA, Met, etc.).
+-   `static/`: The frontend layer (JS modules, CSS segments, assets).
+-   `templates/`: HTML entry point.
+
+### `data/` (The Persistence Layer - Git Ignored)
+-   `video_scripts/`: Source `.md` files.
+-   `ai_responses/`: Cached JSON results from the AI pipeline.
+-   `downloaded_images/`: Physical image storage, organized by script ID.
+
+### `resources/`
+-   `prompts/`: Version-controlled AI instructions for different visual styles (archival, photography, etc.).
+-   `providers_manifest.json`: Configuration for available image sources.
+
+---
+
+## 🛠 Setup & Development
+
+### 1. Prerequisites
+-   Python 3.13+
+-   A DeepSeek API Key
+
+### 2. Installation
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Configuration
+### 3. Configuration
 Create a `.env` file in the root:
 ```env
 DEEPSEEK_API_KEY=your_key_here
@@ -63,34 +95,31 @@ DEEPSEEK_BASE_URL=https://api.deepseek.com
 USE_DB_READ=true
 ```
 
-### 3. Usage
-1. Place a markdown script in `data/video_scripts/`.
-2. Start the server: `python main.py`.
-3. Open `http://localhost:8000`.
-4. Select your script and choose **Image Sources** from the categorized checkboxes.
-5. Click **"Process with AI"**.
-6. **Maintenance**: Run `PYTHONPATH=. python scripts/garbage_collect.py --no-dry-run` to clean up old deleted assets (30-day TTL by default).
-7. **Legacy Data**: Use `scripts/migrate_to_db.py` to import assets from older versions.
-
-## Testing
-The project includes a `pytest` suite.
+### 4. Running the App
 ```bash
-# Run all tests
+# Start the FastAPI server
+python main.py
+```
+Visit `http://localhost:8000` to begin.
+
+### 5. Maintenance Commands
+```bash
+# Clean up orphaned/deleted assets (Dry run by default)
+PYTHONPATH=. python scripts/garbage_collect.py
+
+# Commit cleanup (Force delete)
+PYTHONPATH=. python scripts/garbage_collect.py --no-dry-run
+```
+
+---
+
+## 🧪 Testing
+The project uses `pytest` for backend verification.
+```bash
 PYTHONPATH=. pytest
 ```
 
-## Asset Persistence Model
-Unlike folder-based systems, NarrateImage uses a **Content-to-Asset** mapping:
-1. **Hash the Text**: Every segment's text is hashed (SHA-256) to create a stable "Anchor".
-2. **Deduplicate the Asset**: 
-    - **URL Check**: If the same URL is requested, the system reuses the existing record.
-    - **Binary Hash**: Freshly downloaded images are hashed. If the bytes match an existing file, the new file is deleted and the DB record is linked to the existing one.
-3. **Tracking & TTL**: 
-    - `user_touched`: Any image interacted with by the user is protected from auto-deletion.
-    - `last_used`: Tracks recency for smart cleanup.
-4. **Fuzzy Recovery**: If you change "Hello world" to "Hello world!", the system sees high similarity and automatically re-anchors your images.
-5. **Stable Storage**: Files are saved as `downloaded_images/{script_id}/{uuid}.jpg`. The DB handles a many-to-one relationship.
-6. **Safe GC**: The Garbage Collector uses reference counting. It will only `unlink()` a file if no active or pinned database records point to it and it has exceeded the TTL.
+---
 
-## License
+## 📜 License
 MIT
