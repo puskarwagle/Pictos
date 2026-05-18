@@ -4,10 +4,10 @@
  * Initializes the app, sets up event listeners, and orchestrates module interaction.
  */
 
-import { state } from './state.js';
-import * as api from './api.js';
-import * as ui from './ui.js';
-import { queueDownload } from './queue.js';
+import { state } from './state.js?v=1.0.2';
+import * as api from './api.js?v=1.0.2';
+import * as ui from './ui.js?v=1.0.2';
+import { queueDownload } from './queue.js?v=1.0.2';
 
 const { elements } = ui;
 

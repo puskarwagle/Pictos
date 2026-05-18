@@ -4,9 +4,9 @@
  * Ensures we don't overwhelm the backend with simultaneous yt-dlp searches.
  */
 
-import { state } from './state.js';
-import { fetchClips, translateKeyword } from './api.js';
-import * as ui from './ui.js';
+import { state } from './state.js?v=1.0.2';
+import { fetchClips, translateKeyword } from './api.js?v=1.0.2';
+import * as ui from './ui.js?v=1.0.2';
 
 /** @constant {number} MAX_CONCURRENT - Maximum parallel fetch requests. */
 const MAX_CONCURRENT = 2;
@@ -97,7 +97,14 @@ async function processQueue() {
         state.processedSegments[segmentIdx].clips = Array.from(uniqueClipsMap.values());
 
         // Update tag appearance and refresh clip grid
-        tagElement.classList.add('downloaded');
+        const hasClipsForKeyword = state.processedSegments[segmentIdx].clips.some(clip =>
+            clip.keyword && clip.keyword.toLowerCase() === keyword.toLowerCase()
+        );
+        if (hasClipsForKeyword) {
+            tagElement.classList.add('downloaded');
+        } else {
+            tagElement.classList.remove('downloaded');
+        }
         if (state.activeSegmentIndex === segmentIdx) ui.showClips(segmentIdx);
 
     } catch (err) {

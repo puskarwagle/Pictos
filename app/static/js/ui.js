@@ -5,8 +5,8 @@
  * and rendering clip cards instead of image grids.
  */
 
-import { state } from './state.js';
-import { pinClip, saveSegments } from './api.js';
+import { state } from './state.js?v=1.0.2';
+import { pinClip, saveSegments } from './api.js?v=1.0.2';
 
 export async function syncStateWithBackend() {
     if (!state.selectedScript) return;
@@ -185,10 +185,9 @@ export function renderSegments(onKeywordClick) {
             tag.appendChild(deleteBtn);
 
             // Mark as downloaded if clips exist
-            const isDownloaded = (segment.downloaded_keywords && segment.downloaded_keywords.includes(keyword)) || 
-                                 (segment.clips && segment.clips.some(clip => 
+            const isDownloaded = segment.clips && segment.clips.some(clip => 
                                     clip.keyword && clip.keyword.toLowerCase() === keyword.toLowerCase()
-                                 ));
+                                 );
             if (isDownloaded) tag.classList.add('downloaded');
 
             // Interactive behavior
@@ -201,6 +200,25 @@ export function renderSegments(onKeywordClick) {
             } else {
                 tag.onclick = (e) => {
                     e.stopPropagation();
+
+                    // Activate this segment and show clips in the sidebar
+                    const blocks = document.querySelectorAll('.segment-block');
+                    blocks.forEach(b => b.classList.remove('active'));
+                    const targetBlock = blocks[idx];
+                    if (targetBlock) {
+                        targetBlock.classList.add('active');
+                    }
+                    state.activeSegmentIndex = idx;
+                    showClips(idx);
+
+                    // Scroll to the corresponding keyword section in the right sidebar if it exists
+                    if (elements.rightSidebarClips) {
+                        const targetGroup = elements.rightSidebarClips.querySelector(`[data-keyword="${keyword.toLowerCase()}"]`);
+                        if (targetGroup) {
+                            targetGroup.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        }
+                    }
+
                     if (tag.classList.contains('downloaded')) {
                         console.log(`Clips already exist for "${keyword}", skipping.`);
                         return;
@@ -365,6 +383,7 @@ export function showClips(idx) {
         Object.keys(groups).sort().forEach(keyword => {
             const groupBox = document.createElement('div');
             groupBox.className = 'source-box source-youtube';
+            groupBox.setAttribute('data-keyword', keyword.toLowerCase());
 
             const title = document.createElement('h4');
             title.innerHTML = `<span style="color:#ff0000">▶</span> ${keyword}`;
