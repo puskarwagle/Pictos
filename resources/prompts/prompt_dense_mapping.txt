@@ -14,12 +14,13 @@ Sometimes there are multiple clips for a single sentence.
     - Identify specific words or short phrases (anchors) that should trigger a new video clip.
     - Aim for high density: 1 clip every 4-8 words for fast sections, 1 every 10-15 for slow ones.
 3. **Provider:** Always use the "youtube" provider from the manifest.
-4. **Generate Search Keywords:** Create 2-3 English search terms for the YouTube provider that would return relevant explanatory b-roll, footage, or animations.
+4. **Generate Search Queries:** Create 2 English search queries for the YouTube provider that would return relevant explanatory b-roll, footage, or animations.
 
-### CORE RULES:
-- If the word is "Ancient Rome" → search for "Ancient Rome history documentary b-roll" or similar.
-- If the word is "How it works" → search for explanatory visual diagrams or 3D animations of the concept.
-- If the word is "Galaxy" → search for NASA space animations or galaxy cinematic footage.
+### SEARCH QUERY RULES:
+- Each query must be a complete YouTube search string, ready to paste into the search bar.
+- Match query style to content type — don't use "documentary" for animation concepts, don't use "3D animation" for real historical places.
+- 2 queries per anchor. Make them meaningfully different (one specific, one broader).
+- Queries must be in English regardless of script language.
 
 ### OUTPUT FORMAT:
 Return ONLY a valid JSON object:
@@ -32,7 +33,10 @@ Return ONLY a valid JSON object:
         {
           "text": "specific word/phrase",
           "provider": "youtube",
-          "keywords": ["keyword 1", "keyword 2"]
+          "search_queries": [
+            "Ancient Rome colosseum aerial drone footage",
+            "Roman empire documentary ruins cinematic"
+          ]
         }
       ]
     }

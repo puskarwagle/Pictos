@@ -254,7 +254,8 @@ class AIService:
             all_keywords = []
             for anchor in seg.get("anchors", []):
                 provider = anchor.get("provider", "pinterest")
-                keywords = [f"{provider}:{k}" for k in anchor.get("keywords", [])]
+                queries = anchor.get("search_queries") or anchor.get("keywords") or []
+                keywords = [f"{provider}:{q}" for q in queries]
                 all_keywords.extend(keywords)
                 all_keywords.append("|")
             
