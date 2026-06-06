@@ -4,12 +4,12 @@ import sys
 import json
 
 # Add project root to path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 from app.services.ai_service import ai_service
 
 async def test_chunking():
-    script_path = "scripts-backups/adhd-english.md"
+    script_path = "data/video_scripts/adhd-english.md"
     if not os.path.exists(script_path):
         print(f"Error: {script_path} not found.")
         return
