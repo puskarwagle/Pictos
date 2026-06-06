@@ -12,6 +12,7 @@ ENV/
 data/downloaded_images/
 data/ai_responses/
 data/video_scripts/
+data/downloaded_clips/
 reconciliation_report.json
 docs/
 git_workflow.md
