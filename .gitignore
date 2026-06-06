@@ -14,6 +14,7 @@ data/ai_responses/
 data/video_scripts/
 reconciliation_report.json
 docs/
+git_workflow.md
 
 # Logs
 *.log
