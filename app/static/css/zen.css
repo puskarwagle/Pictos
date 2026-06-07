@@ -1,0 +1,190 @@
+/* ── Zen Mode ── */
+
+#zenContent {
+    display: none;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 60px 40px;
+    font-size: 1.4rem;
+    line-height: 1.8;
+    color: #e0e0e0;
+    word-wrap: break-word;
+}
+
+#zenContent h1 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    margin: 1.5em 0 0.5em;
+    color: #fff;
+    text-align: center;
+}
+
+#zenContent h2 {
+    font-size: 1.8rem;
+    font-weight: 600;
+    margin: 1.2em 0 0.4em;
+    color: #fff;
+}
+
+#zenContent h3 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 1em 0 0.3em;
+    color: #fff;
+}
+
+#zenContent p {
+    margin: 1em 0;
+}
+
+#zenContent ul, #zenContent ol {
+    padding-left: 1.5em;
+    margin: 0.8em 0;
+}
+
+#zenContent li {
+    margin: 0.3em 0;
+}
+
+#zenContent strong {
+    color: #fff;
+    font-weight: 700;
+}
+
+#zenContent em {
+    font-style: italic;
+}
+
+#zenContent code {
+    background: rgba(255,255,255,0.1);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    font-family: monospace;
+}
+
+#zenContent pre {
+    background: rgba(255,255,255,0.05);
+    padding: 16px;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-size: 0.85em;
+    line-height: 1.5;
+    margin: 1em 0;
+}
+
+#zenContent pre code {
+    background: none;
+    padding: 0;
+    border-radius: 0;
+}
+
+#zenContent blockquote {
+    border-left: 4px solid #e60023;
+    padding-left: 16px;
+    margin: 1em 0;
+    opacity: 0.85;
+}
+
+#zenContent hr {
+    border: none;
+    border-top: 1px solid rgba(255,255,255,0.15);
+    margin: 2em 0;
+}
+
+#zenContent img {
+    max-width: 100%;
+    border-radius: 8px;
+    margin: 1em 0;
+    display: block;
+}
+
+#zenContent a {
+    color: #e60023;
+    text-decoration: underline;
+}
+
+/* ── Body zen-mode ── */
+
+body.zen-mode {
+    background: #000 !important;
+}
+
+body.zen-mode .sidebar {
+    display: none !important;
+}
+
+body.zen-mode .resizer {
+    display: none !important;
+}
+
+body.zen-mode .right-sidebar {
+    display: none !important;
+}
+
+body.zen-mode .content-area {
+    max-width: 100% !important;
+    width: 100% !important;
+    flex: 1 !important;
+    background: #000 !important;
+    backdrop-filter: none !important;
+    display: flex !important;
+    align-items: flex-start;
+    justify-content: center;
+    overflow-y: auto;
+}
+
+body.zen-mode #editorContainer {
+    display: none !important;
+}
+
+body.zen-mode #segmentsContainer {
+    display: none !important;
+}
+
+body.zen-mode #zenContent {
+    display: block;
+}
+
+body.zen-mode #statusMessage {
+    display: none !important;
+}
+
+/* ── Exit Button Overlay ── */
+
+#zenModeExit {
+    position: fixed;
+    top: 0;
+    right: 0;
+    z-index: 9999;
+    padding: 30px;
+    opacity: 0;
+    transition: opacity 4s ease;
+}
+
+#zenModeExit:hover,
+#zenModeExit.visible {
+    opacity: 1;
+    transition: opacity 0.2s ease;
+}
+
+#zenModeExitBtn {
+    background: rgba(255,255,255,0.12);
+    color: #ccc;
+    border: 1px solid rgba(255,255,255,0.2);
+    padding: 12px 24px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+    backdrop-filter: blur(8px);
+    transition: background 0.2s, color 0.2s;
+    width: auto;
+}
+
+#zenModeExitBtn:hover {
+    background: rgba(255,255,255,0.2);
+    color: #fff;
+    transform: none;
+    box-shadow: none;
+}

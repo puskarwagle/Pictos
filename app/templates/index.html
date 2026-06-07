@@ -62,6 +62,13 @@
                         </label>
                     </div>
                     <div class="toggle-container">
+                        <span class="toggle-label">Zen Mode</span>
+                        <label class="switch">
+                            <input type="checkbox" id="zenModeToggle">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="toggle-container">
                         <span class="toggle-label">Dark Mode</span>
                         <label class="switch">
                             <input type="checkbox" id="darkModeToggle">
@@ -78,6 +85,10 @@
 
                 <div id="segmentsContainer" class="segments-container">
                     <!-- Segment blocks will be injected here -->
+                </div>
+
+                <div id="zenContent">
+                    <!-- Zen mode markdown rendered here -->
                 </div>
             </main>
 
@@ -115,6 +126,10 @@
     </div>
 
     <div id="toastContainer" class="toast-container"></div>
+
+    <div id="zenModeExit">
+        <button id="zenModeExitBtn">Exit Zen Mode</button>
+    </div>
 
     <script type="module" src="/static/js/main.js?v=1.0.2"></script>
 </body>

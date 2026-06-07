@@ -45,7 +45,11 @@ export const elements = {
     resizer: document.getElementById('resizer'),
     rightSidebar: document.getElementById('rightSidebar'),
     statusMsg: document.getElementById('statusMessage'),
-    addSegmentBtn: document.getElementById('addSegmentBtn')
+    addSegmentBtn: document.getElementById('addSegmentBtn'),
+    zenModeToggle: document.getElementById('zenModeToggle'),
+    zenContent: document.getElementById('zenContent'),
+    zenModeExit: document.getElementById('zenModeExit'),
+    zenModeExitBtn: document.getElementById('zenModeExitBtn'),
 };
 
 /**
@@ -537,4 +541,105 @@ export async function pinSelectedClips() {
         console.error('Failed to pin clips:', err);
         setStatus('Error pinning clips', false, true);
     }
+}
+
+let zenModeFadeTimer = null;
+
+function simpleMarkdown(text) {
+    let html = text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+    html = html.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+    html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+    html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+    html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+    html = html.replace(/^\* (.+)$/gm, '<li>$1</li>');
+    html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    html = html.replace(/^---+\s*$/gm, '<hr>');
+
+    const lines = html.split('\n');
+    const result = [];
+    let inList = false;
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (line === '') {
+            if (inList) { result.push('</ul>'); inList = false; }
+            continue;
+        }
+        if (line.match(/^<(h[123]|li|ul|ol|pre|hr|blockquote)/)) {
+            if (inList && !line.startsWith('<li>')) { result.push('</ul>'); inList = false; }
+            result.push(line);
+            continue;
+        }
+        if (line.startsWith('<li>')) {
+            if (!inList) { result.push('<ul>'); inList = true; }
+            result.push(line);
+            continue;
+        }
+        if (inList) { result.push('</ul>'); inList = false; }
+        result.push('<p>' + line + '</p>');
+    }
+    if (inList) result.push('</ul>');
+
+    return result.join('\n');
+}
+
+export function enterZenMode() {
+    if (!state.selectedScript) return;
+    const editorVal = elements.scriptEditor ? elements.scriptEditor.value : '';
+    if (!editorVal) return;
+
+    state.isZenMode = true;
+    document.body.classList.add('zen-mode');
+
+    if (elements.zenContent) {
+        elements.zenContent.innerHTML = simpleMarkdown(editorVal);
+    }
+
+    if (elements.zenModeExit) {
+        elements.zenModeExit.classList.add('visible');
+        clearTimeout(zenModeFadeTimer);
+        zenModeFadeTimer = setTimeout(() => {
+            elements.zenModeExit.classList.remove('visible');
+        }, 3000);
+    }
+
+    if (elements.zenModeExitBtn) {
+        elements.zenModeExitBtn.onclick = () => exitZenMode();
+    }
+
+    document.addEventListener('keydown', onZenEscape);
+
+    localStorage.setItem('zenMode', 'true');
+}
+
+function onZenEscape(e) {
+    if (e.key === 'Escape') {
+        e.preventDefault();
+        exitZenMode();
+    }
+}
+
+export function exitZenMode() {
+    state.isZenMode = false;
+    document.body.classList.remove('zen-mode');
+
+    if (elements.zenContent) {
+        elements.zenContent.innerHTML = '';
+    }
+    if (elements.zenModeExit) {
+        elements.zenModeExit.classList.remove('visible');
+    }
+    if (elements.zenModeToggle) {
+        elements.zenModeToggle.checked = false;
+    }
+
+    document.removeEventListener('keydown', onZenEscape);
+    clearTimeout(zenModeFadeTimer);
+    localStorage.setItem('zenMode', 'false');
 }

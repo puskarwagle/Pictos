@@ -57,4 +57,6 @@ export const state = {
      * @type {Set<string>} 
      */
     selectedClipIds: new Set(),
+
+    isZenMode: false,
 };

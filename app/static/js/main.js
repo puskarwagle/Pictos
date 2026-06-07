@@ -14,6 +14,7 @@ const { elements } = ui;
 document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
     initDarkMode();
+    initZenMode();
     loadScripts();
 });
 
@@ -21,6 +22,7 @@ function setupEventListeners() {
     // Back button
     if (elements.backBtn) {
         elements.backBtn.addEventListener('click', () => {
+            if (state.isZenMode) ui.exitZenMode();
             state.selectedScript = null;
             localStorage.removeItem('lastChosenScript');
             ui.showScriptsList();
@@ -39,6 +41,22 @@ function setupEventListeners() {
     if (elements.translateToggle) {
         elements.translateToggle.addEventListener('change', (e) => {
             localStorage.setItem('translateToggle', e.target.checked);
+        });
+    }
+
+    // Zen Mode Toggle
+    if (elements.zenModeToggle) {
+        elements.zenModeToggle.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                if (!state.selectedScript) {
+                    e.target.checked = false;
+                    ui.showToast('Select a script first', 'warning');
+                    return;
+                }
+                ui.enterZenMode();
+            } else {
+                ui.exitZenMode();
+            }
         });
     }
 
@@ -181,6 +199,19 @@ function initDarkMode() {
     const shouldTranslate = localStorage.getItem('translateToggle') === 'true';
     if (elements.translateToggle) {
         elements.translateToggle.checked = shouldTranslate;
+    }
+}
+
+function initZenMode() {
+    const isZen = localStorage.getItem('zenMode') === 'true';
+    if (isZen && elements.zenModeToggle) {
+        if (!state.selectedScript) {
+            elements.zenModeToggle.checked = false;
+            localStorage.setItem('zenMode', 'false');
+        } else {
+            elements.zenModeToggle.checked = true;
+            ui.enterZenMode();
+        }
     }
 }
 
