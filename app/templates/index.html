@@ -80,7 +80,7 @@
 
             <main class="content-area" id="contentArea">
                 <div id="editorContainer" class="editor-section">
-                    <textarea id="scriptEditor" placeholder="Script content will appear here..."></textarea>
+                    <div id="scriptEditor" class="editor-content" contenteditable="false"></div>
                 </div>
 
                 <div id="segmentsContainer" class="segments-container">
@@ -127,8 +127,11 @@
 
     <div id="toastContainer" class="toast-container"></div>
 
-    <div id="zenModeExit">
-        <button id="zenModeExitBtn">Exit Zen Mode</button>
+    <div id="modeOverlay">
+        <div class="overlay-buttons">
+            <button id="exitBtn">Exit</button>
+            <button id="saveBtn" class="save-btn">Save</button>
+        </div>
     </div>
 
     <script type="module" src="/static/js/main.js?v=1.0.2"></script>

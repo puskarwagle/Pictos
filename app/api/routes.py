@@ -68,12 +68,21 @@ async def get_script(filename: str):
     with open(script_path, "r") as f:
         return {"content": f.read()}
 
+@router.post("/api/script/{filename}")
+async def save_script(filename: str, request: dict):
+    script_path = SCRIPTS_DIR / filename
+    if not script_path.exists():
+        raise HTTPException(status_code=404, detail="Script not found")
+    with open(script_path, "w") as f:
+        f.write(request.get("content", ""))
+    return {"status": "success"}
+
 @router.get("/api/script/{filename}/response")
 async def get_script_response(filename: str):
     stem = Path(filename).stem
     response_file = RESPONSES_DIR / f"{stem}.json"
     if not response_file.exists():
-        raise HTTPException(status_code=404, detail="No cached response found")
+        return []
     with open(response_file, "r") as f:
         data = json.load(f)
         segments = data.get("segments", data) if isinstance(data, dict) else data

@@ -114,6 +114,21 @@ export async function translateKeyword(keyword) {
 }
 
 /**
+ * Saves the raw script file content to disk.
+ * @param {string} filename
+ * @param {string} content
+ */
+export async function saveScriptFile(filename, content) {
+    const response = await fetch(`/api/script/${filename}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content })
+    });
+    if (!response.ok) throw new Error('Failed to save script');
+    return await response.json();
+}
+
+/**
  * Saves the current segments to the backend, syncing DB and JSON cache.
  * @param {string} filename
  * @param {Array<Object>} segments

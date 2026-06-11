@@ -59,4 +59,6 @@ export const state = {
     selectedClipIds: new Set(),
 
     isZenMode: false,
+
+    originalScriptContent: '',
 };

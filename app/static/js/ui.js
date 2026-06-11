@@ -17,6 +17,24 @@ export async function syncStateWithBackend() {
     }
 }
 
+export async function saveScript() {
+    if (!state.selectedScript) return;
+    const text = elements.scriptEditor ? elements.scriptEditor.textContent.trim() : '';
+    if (!text) return;
+
+    const segments = createDefaultSegments(text);
+    state.processedSegments = segments;
+    state.isAiProcessed = false;
+
+    try {
+        await saveSegments(state.selectedScript, segments);
+        showToast('Script saved', 'success', 2000);
+    } catch (e) {
+        showToast('Failed to save script', 'error');
+        console.error('Save failed:', e);
+    }
+}
+
 /** 
  * Central registry of all DOM elements used by the application.
  */
@@ -50,6 +68,9 @@ export const elements = {
     zenContent: document.getElementById('zenContent'),
     zenModeExit: document.getElementById('zenModeExit'),
     zenModeExitBtn: document.getElementById('zenModeExitBtn'),
+    saveScriptBtn: document.getElementById('saveScriptBtn'),
+    saveBtn: document.getElementById('saveBtn'),
+    exitBtn: document.getElementById('exitBtn'),
 };
 
 /**
@@ -591,7 +612,7 @@ function simpleMarkdown(text) {
 
 export function enterZenMode() {
     if (!state.selectedScript) return;
-    const editorVal = elements.scriptEditor ? elements.scriptEditor.value : '';
+    const editorVal = elements.scriptEditor ? elements.scriptEditor.textContent : '';
     if (!editorVal) return;
 
     state.isZenMode = true;

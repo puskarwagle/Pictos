@@ -150,41 +150,134 @@ body.zen-mode #statusMessage {
     display: none !important;
 }
 
-/* ── Exit Button Overlay ── */
+/* ── Body edit-mode ── */
 
-#zenModeExit {
+body.edit-mode {
+    background: #000 !important;
+}
+
+body.edit-mode .sidebar {
+    display: none !important;
+}
+
+body.edit-mode .resizer {
+    display: none !important;
+}
+
+body.edit-mode .right-sidebar {
+    display: none !important;
+}
+
+body.edit-mode .content-area {
+    max-width: 100% !important;
+    width: 100% !important;
+    flex: 1 !important;
+    background: #000 !important;
+    backdrop-filter: none !important;
+    display: flex !important;
+    align-items: flex-start;
+    justify-content: center;
+    overflow-y: auto;
+}
+
+body.edit-mode #segmentsContainer {
+    display: none !important;
+}
+
+body.edit-mode #editorContainer {
+    display: flex !important;
+    width: 100%;
+}
+
+body.edit-mode #statusMessage {
+    display: none !important;
+}
+
+/* ── Overlay Buttons (edit-mode only) ── */
+
+#modeOverlay {
+    display: none;
+}
+
+body.edit-mode #modeOverlay {
+    display: block;
+}
+
+#exitBtn {
+    width: auto;
     position: fixed;
-    top: 0;
-    right: 0;
-    z-index: 9999;
-    padding: 30px;
-    opacity: 0;
-    transition: opacity 4s ease;
-}
-
-#zenModeExit:hover,
-#zenModeExit.visible {
-    opacity: 1;
-    transition: opacity 0.2s ease;
-}
-
-#zenModeExitBtn {
+    top: 20px;
+    left: 20px;
+    z-index: 10000;
     background: rgba(255,255,255,0.12);
     color: #ccc;
     border: 1px solid rgba(255,255,255,0.2);
-    padding: 12px 24px;
+    padding: 10px 22px;
     border-radius: 8px;
     cursor: pointer;
     font-size: 0.85rem;
     font-weight: 500;
     backdrop-filter: blur(8px);
     transition: background 0.2s, color 0.2s;
-    width: auto;
 }
 
-#zenModeExitBtn:hover {
+#exitBtn:hover {
     background: rgba(255,255,255,0.2);
     color: #fff;
-    transform: none;
-    box-shadow: none;
+}
+
+#saveBtn {
+    width: auto;
+    display: none;
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 10000;
+    background: #e60023;
+    color: #fff;
+    border: none;
+    padding: 10px 22px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    transition: background 0.2s, transform 0.1s;
+}
+
+body.edit-mode #saveBtn {
+    display: block;
+}
+
+#saveBtn:hover {
+    background: #ad081b;
+    transform: translateY(-1px);
+}
+
+/* ── Editor content ── */
+
+.editor-content {
+    flex: 1;
+    width: 100%;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 60px 40px;
+    font-size: 1.2rem;
+    line-height: 1.9;
+    color: #ccc;
+    outline: none;
+    overflow-y: auto;
+    font-family: inherit;
+    white-space: pre-wrap;
+}
+
+body.edit-mode .editor-content {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 60px 40px;
+    font-size: 1.4rem;
+    line-height: 1.8;
+    color: #e0e0e0;
+    word-wrap: break-word;
+    white-space: pre-wrap;
 }

@@ -65,14 +65,14 @@ function setupEventListeners() {
         elements.editModeToggle.addEventListener('change', (e) => {
             state.isEditMode = e.target.checked;
             document.body.classList.toggle('edit-mode', state.isEditMode);
-            if (elements.scriptEditor) elements.scriptEditor.readOnly = !state.isEditMode;
+            if (elements.scriptEditor) elements.scriptEditor.contentEditable = state.isEditMode ? 'true' : 'false';
             
             if (elements.editorContainer) elements.editorContainer.style.display = state.isEditMode ? 'flex' : 'none';
             if (elements.segmentsContainer) elements.segmentsContainer.style.display = state.isEditMode ? 'none' : 'flex';
             
             if (!state.isEditMode) {
                 if (!state.isAiProcessed) {
-                    const editorVal = elements.scriptEditor ? elements.scriptEditor.value : '';
+                    const editorVal = elements.scriptEditor ? elements.scriptEditor.textContent : '';
                     state.processedSegments = ui.createDefaultSegments(editorVal);
                 }
                 ui.renderSegments(queueDownload);
@@ -90,11 +90,58 @@ function setupEventListeners() {
         });
     }
 
+    // Save Script (Edit Mode overlay)
+    if (elements.saveBtn) {
+        elements.saveBtn.addEventListener('click', async () => {
+            if (!state.selectedScript || !elements.scriptEditor) return;
+            const content = elements.scriptEditor.textContent;
+            if (!content.trim()) return;
+            try {
+                await api.saveScriptFile(state.selectedScript, content);
+                ui.showToast('Script saved to disk', 'success', 2000);
+            } catch (err) {
+                ui.showToast('Failed to save: ' + err.message, 'error');
+            }
+        });
+    }
+
+    // Exit (overlay — handles edit mode and zen mode)
+    if (elements.exitBtn) {
+        elements.exitBtn.addEventListener('click', () => {
+            if (state.isZenMode) {
+                ui.exitZenMode();
+                return;
+            }
+            state.isEditMode = false;
+            if (elements.editModeToggle) elements.editModeToggle.checked = false;
+            document.body.classList.remove('edit-mode');
+            if (elements.scriptEditor) elements.scriptEditor.contentEditable = 'false';
+            if (elements.editorContainer) elements.editorContainer.style.display = 'none';
+            if (elements.segmentsContainer) elements.segmentsContainer.style.display = 'flex';
+            if (!state.isAiProcessed) {
+                const editorVal = elements.scriptEditor ? elements.scriptEditor.textContent : '';
+                state.processedSegments = ui.createDefaultSegments(editorVal);
+            }
+            ui.renderSegments(queueDownload);
+        });
+    }
+
+    // Escape key exits edit mode
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && state.isEditMode) {
+            e.preventDefault();
+            if (elements.editModeToggle) {
+                elements.editModeToggle.checked = false;
+                elements.editModeToggle.dispatchEvent(new Event('change'));
+            }
+        }
+    });
+
     // Process with AI
     if (elements.processBtn) {
         elements.processBtn.addEventListener('click', async () => {
             if (!state.selectedScript) return;
-            const scriptText = elements.scriptEditor ? elements.scriptEditor.value.trim() : '';
+            const scriptText = elements.scriptEditor ? elements.scriptEditor.textContent.trim() : '';
             if (!scriptText) return alert('Editor is empty!');
 
             try {
@@ -115,7 +162,7 @@ function setupEventListeners() {
                 state.isEditMode = false;
                 if (elements.editModeToggle) elements.editModeToggle.checked = false;
                 document.body.classList.remove('edit-mode');
-                if (elements.scriptEditor) elements.scriptEditor.readOnly = true;
+                if (elements.scriptEditor) elements.scriptEditor.contentEditable = 'false';
                 if (elements.editorContainer) elements.editorContainer.style.display = 'none';
                 if (elements.segmentsContainer) elements.segmentsContainer.style.display = 'flex';
                 
@@ -256,20 +303,20 @@ async function selectScript(filename) {
         
         const data = await api.getScriptContent(filename);
         if (elements.scriptEditor) {
-            elements.scriptEditor.value = data.content;
-            elements.scriptEditor.readOnly = !state.isEditMode;
+            elements.scriptEditor.textContent = data.content;
+            elements.scriptEditor.contentEditable = state.isEditMode ? 'true' : 'false';
         }
         if (elements.segmentsContainer) elements.segmentsContainer.innerHTML = '';
         
         const cachedResponse = await api.getScriptCache(filename);
-        if (cachedResponse) {
+        if (cachedResponse && cachedResponse.length > 0) {
             state.processedSegments = cachedResponse;
             state.isAiProcessed = true;
             ui.renderSegments(queueDownload);
             ui.setStatus(`Loaded: ${filename}. Cached AI response found.`, false, true);
         } else {
             state.isAiProcessed = false;
-            const editorVal = elements.scriptEditor ? elements.scriptEditor.value : '';
+            const editorVal = elements.scriptEditor ? elements.scriptEditor.textContent : '';
             state.processedSegments = ui.createDefaultSegments(editorVal);
             ui.renderSegments(queueDownload);
             ui.setStatus('No cached response found. Displaying raw script segments. Click Process to start.');

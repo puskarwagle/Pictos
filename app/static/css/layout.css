@@ -70,21 +70,7 @@
 #scriptEditor {
     flex: 1;
     width: 100%;
-    padding: 15px;
-    border: 1px solid var(--editor-border);
-    border-radius: 12px;
-    background: var(--editor-bg);
-    color: var(--editor-text);
-    font-family: inherit;
-    font-size: 1rem;
-    resize: vertical;
     outline: none;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-}
-
-#scriptEditor:focus {
-    border-color: #e60023;
-    box-shadow: 0 0 0 3px rgba(230, 0, 35, 0.1);
 }
 
 .right-sidebar {
